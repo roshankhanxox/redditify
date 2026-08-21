@@ -32,24 +32,24 @@ Last updated: 2026-08-22
 ## Phase 2 — Backend Services
 
 ### Reddit Integration (branch: feature/reddit-api)
-- [ ] PRAW client initialized as singleton
-- [ ] search_posts() filters non-self posts and empty/deleted bodies
-- [ ] fetch_post() returns title, body, subreddit, score, author
-- [ ] preprocess_text() strips Markdown, truncates to max_words, prepends subreddit intro
-- [ ] GET /reddit/search endpoint working (q, subreddit, sort, limit params)
-- [ ] GET /reddit/post/{post_id} endpoint working
-- [ ] feature/reddit-api merged to main
+- [x] PRAW client initialized as singleton
+- [x] search_posts() filters non-self posts and empty/deleted bodies
+- [x] fetch_post() returns title, body, subreddit, score, author
+- [x] preprocess_text() strips Markdown, truncates to max_words, prepends subreddit intro
+- [x] GET /reddit/search endpoint working (q, subreddit, sort, limit params)
+- [x] GET /reddit/post/{post_id} endpoint working
+- [x] feature/reddit-api merged to main
 
 ### TTS & Whisper (branch: feature/tts-whisper)
-- [ ] ElevenLabs SDK installed and generate_voiceover_elevenlabs() working
-- [ ] edge-tts installed and generate_voiceover_edge() working (async wrapped)
-- [ ] Fallback chain implemented: ElevenLabs → edge-tts, fallback logged silently
-- [ ] openai-whisper installed (LOCAL package, not cloud API)
-- [ ] Whisper model loaded as module-level singleton in whisper_service.py
-- [ ] transcribe() returns word-level timestamp dicts
-- [ ] words_to_chunks() groups into 4-word chunks, all-caps
-- [ ] chunks_to_srt() generates valid SRT file with correct timestamp format
-- [ ] feature/tts-whisper merged to main
+- [x] ElevenLabs SDK installed and generate_voiceover_elevenlabs() working
+- [x] edge-tts installed and generate_voiceover_edge() working (async wrapped)
+- [x] Fallback chain implemented: ElevenLabs → edge-tts, fallback logged silently
+- [x] openai-whisper installed (LOCAL package, not cloud API)
+- [x] Whisper model loaded as module-level singleton in whisper_service.py
+- [x] transcribe() returns word-level timestamp dicts
+- [x] words_to_chunks() groups into 4-word chunks, all-caps
+- [x] chunks_to_srt() generates valid SRT file with correct timestamp format
+- [x] feature/tts-whisper merged to main
 
 ### FFmpeg Pipeline (branch: feature/ffmpeg-pipeline)
 - [ ] run_ffmpeg() helper captures stderr, raises RuntimeError with full output on failure
