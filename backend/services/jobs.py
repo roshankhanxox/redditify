@@ -4,7 +4,6 @@ from sqlalchemy import select
 
 ACTIVE_STATUSES = (
     "QUEUED",
-    "FETCHING_POST",
     "GENERATING_VOICEOVER",
     "TRANSCRIBING",
     "RENDERING_TITLE_CARD",
@@ -14,8 +13,8 @@ ACTIVE_STATUSES = (
 )
 
 
-async def find_active_job(user_id: uuid.UUID, post_id: str):
-    """Return an existing in-flight job for the same user+post, for duplicate detection."""
+async def find_active_job(user_id: uuid.UUID, title: str):
+    """Return an existing in-flight job for the same user+title (duplicate guard)."""
     from db import SessionLocal
     from models import Job
 
@@ -23,7 +22,7 @@ async def find_active_job(user_id: uuid.UUID, post_id: str):
         return await db.scalar(
             select(Job).where(
                 Job.user_id == user_id,
-                Job.post_id == post_id,
+                Job.post_title == title,
                 Job.status.in_(ACTIVE_STATUSES),
             )
         )

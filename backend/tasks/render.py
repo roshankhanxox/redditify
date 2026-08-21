@@ -16,7 +16,7 @@ celery = Celery("reelbot", broker=settings.REDIS_URL, backend=settings.REDIS_URL
 
 
 @celery.task(bind=True, max_retries=2, default_retry_delay=30)
-def generate_reel(self, job_id: str, post_id: str, settings_dict: dict):
+def generate_reel(self, job_id: str):
     tmp = os.path.join("/tmp/reelbot", job_id)
     os.makedirs(tmp, exist_ok=True)
 
@@ -34,18 +34,23 @@ def generate_reel(self, job_id: str, post_id: str, settings_dict: dict):
             db.commit()
 
     try:
-        from services import assets, reddit_client, storage, title_card, tts, video, whisper_service
+        from services import assets, storage, title_card, tts, video, whisper_service
+        from services.text import preprocess_text
+        from models import Job
+        from sync_db import SyncSessionLocal
 
-        set_status("FETCHING_POST")
-        post = reddit_client.fetch_post(post_id)
-        text = reddit_client.preprocess_text(
-            post["body"], post["subreddit"], post["title"],
-            max_words=settings_dict.get("max_words", 1200),
-        )
+        with SyncSessionLocal() as db:
+            job = db.get(Job, uuid.UUID(job_id))
+            title = job.post_title
+            raw_story = job.post_body
+            cfg = job.settings or {}
+
+        subreddit_label = cfg.get("subreddit_label") or "reelbot"
 
         set_status("GENERATING_VOICEOVER")
+        text = preprocess_text(raw_story, subreddit_label, title, max_words=cfg.get("max_words", 1200))
         audio_path = tts.generate_voiceover(
-            text, settings_dict.get("voice", "male"), os.path.join(tmp, "voice.mp3")
+            text, cfg.get("voice", "male"), os.path.join(tmp, "voice.mp3")
         )
 
         set_status("TRANSCRIBING")
@@ -55,13 +60,13 @@ def generate_reel(self, job_id: str, post_id: str, settings_dict: dict):
 
         set_status("RENDERING_TITLE_CARD")
         card_path = title_card.render(
-            post["title"], post["subreddit"],
-            settings_dict.get("title_style", "dark"),
+            title, subreddit_label,
+            cfg.get("title_style", "dark"),
             os.path.join(tmp, "title.png"),
         )
 
         set_status("PICKING_GAMEPLAY")
-        clip_path = asyncio.run(assets.pick_clip(settings_dict.get("gameplay_category", "any")))
+        clip_path = asyncio.run(assets.pick_clip(cfg.get("gameplay_category", "any")))
 
         set_status("COMPOSITING_VIDEO")
         output_path = video.render_video(clip_path, audio_path, card_path, srt_path, os.path.join(tmp, "output.mp4"))
@@ -73,10 +78,9 @@ def generate_reel(self, job_id: str, post_id: str, settings_dict: dict):
         set_status("DONE", result_url=result_key, duration_seconds=duration)
 
     except Exception as exc:
-        # Spec deviation note: the pipeline is marked FAILED immediately so users see the
-        # error. Auto-retry (max_retries=2, 30s delay) only fires for transient network
-        # errors — re-running the whole pipeline after a permanent failure would burn
-        # TTS quota for nothing.
+        # Auto-retry (max_retries=2, 30s delay) only fires for transient network
+        # errors — re-running the whole pipeline after a permanent failure would
+        # burn TTS quota for nothing.
         transient = isinstance(exc, (ConnectionError, TimeoutError))
         set_status("FAILED", error_message=str(exc)[:2000])
         if transient and self.request.retries < (self.max_retries or 0):

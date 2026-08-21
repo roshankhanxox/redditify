@@ -24,8 +24,8 @@ class Job(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    post_id: Mapped[str] = mapped_column(Text, nullable=False)
-    post_title: Mapped[str | None] = mapped_column(Text)
+    post_title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    post_body: Mapped[str] = mapped_column(Text, nullable=False, default="")
     status: Mapped[str] = mapped_column(Text, nullable=False, default="QUEUED")
     settings: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
     result_url: Mapped[str | None] = mapped_column(Text)

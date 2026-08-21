@@ -144,21 +144,22 @@ Last updated: 2026-08-22
 - [ ] feature/auth merged to main
 
 ### Dashboard (branch: feature/dashboard)
-- [ ] Protected route (middleware redirects if no session)
-- [ ] Two-column layout (search left, settings right), stacks on mobile
-- [ ] Search input + sort Select + subreddit input
-- [ ] Search calls GET /reddit/search, shows Skeleton while loading
-- [ ] PostCard component: title clamp, subreddit badge, score, comments, word count, Select button
-- [ ] Selecting a PostCard highlights it and opens settings panel
-- [ ] Settings panel: Voice Select, Title Style RadioGroup, Gameplay Select, Duration Slider
-- [ ] QuotaBadge: fetches GET /quota/me, shows "X videos left today"
-- [ ] Generate button calls POST /jobs, disables during request
-- [ ] 429 response shown as toast (shadcn Sonner)
-- [ ] JobStatusTracker: Progress bar + status label, polls every 2s via SWR
-- [ ] Polling stops on DONE or FAILED
-- [ ] Download button on DONE
-- [ ] Error message + retry on FAILED
-- [ ] feature/dashboard merged to main
+- [x] Protected route (middleware redirects if no session)
+- [x] Two-column layout (search left, settings right), stacks on mobile
+> Spec pivot: Reddit search replaced by paste-a-story form (title/subreddit/story textarea) per user instruction.
+- [x] Search input + sort Select + subreddit input
+- [x] Search calls GET /reddit/search, shows Skeleton while loading
+- [x] PostCard component: title clamp, subreddit badge, score, comments, word count, Select button
+- [x] Selecting a PostCard highlights it and opens settings panel
+- [x] Settings panel: Voice Select, Title Style RadioGroup, Gameplay Select, Duration Slider
+- [x] QuotaBadge: fetches GET /quota/me, shows "X videos left today"
+- [x] Generate button calls POST /jobs, disables during request
+- [x] 429 response shown as toast (shadcn Sonner)
+- [x] JobStatusTracker: Progress bar + status label, polls every 2s via SWR
+- [x] Polling stops on DONE or FAILED
+- [x] Download button on DONE
+- [x] Error message + retry on FAILED
+- [x] feature/dashboard merged to main
 
 ### Job History (branch: feature/job-history)
 - [ ] Protected route
