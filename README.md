@@ -89,7 +89,7 @@ erDiagram
         boolean enabled
     }
     QUOTA_USAGE {
-        uuid user_id PK,FK
+        uuid user_id PK, "FK"
         text period PK
         int count
     }
