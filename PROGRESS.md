@@ -125,15 +125,15 @@ Last updated: 2026-08-22
 - [x] feature/frontend-setup merged to main
 
 ### Landing Page (branch: feature/landing-page)
-- [ ] Navbar with logo, Sign In, Get Started buttons
-- [ ] Hero section: headline, subheading, two CTAs (no background image, dark minimal)
-- [ ] How It Works: three shadcn Cards (Search / Pick / Download)
-- [ ] Features: 2x3 grid of feature cards
-- [ ] Pricing: two cards (Free / Admin)
-- [ ] Footer
-- [ ] Fully responsive (mobile stacks)
-- [ ] No auth required to view
-- [ ] feature/landing-page merged to main
+- [x] Navbar with logo, Sign In, Get Started buttons
+- [x] Hero section: headline, subheading, two CTAs (no background image, dark minimal)
+- [x] How It Works: three shadcn Cards (Search / Pick / Download)
+- [x] Features: 2x3 grid of feature cards
+- [x] Pricing: two cards (Free / Admin)
+- [x] Footer
+- [x] Fully responsive (mobile stacks)
+- [x] No auth required to view
+- [x] feature/landing-page merged to main
 
 ### Auth Pages (branch: feature/auth)
 - [ ] /sign-in page: centered shadcn Card, email + password, validation errors inline
