@@ -172,13 +172,13 @@ Last updated: 2026-08-22
 - [x] feature/job-history merged to main
 
 ### Admin Panel (branch: feature/admin-panel)
-- [ ] Protected + role check (redirect non-admins to /dashboard)
-- [ ] shadcn Tabs: Overview / Users / Assets / Jobs
-- [ ] Overview: stat cards (total jobs, today's jobs, total users, storage)
-- [ ] Users tab: table with role badge, Edit Dialog to change role
-- [ ] Assets tab: clip list with category badge, duration, enabled Switch, delete button; upload Dialog
-- [ ] Jobs tab: all jobs table with user email column
-- [ ] feature/admin-panel merged to main
+- [x] Protected + role check (redirect non-admins to /dashboard)
+- [x] shadcn Tabs: Overview / Users / Assets / Jobs
+- [x] Overview: stat cards (total jobs, today's jobs, total users, storage)
+- [x] Users tab: table with role badge, Edit Dialog to change role
+- [x] Assets tab: clip list with category badge, duration, enabled Switch, delete button; upload Dialog
+- [x] Jobs tab: all jobs table with user email column
+- [x] feature/admin-panel merged to main
 
 ---
 
