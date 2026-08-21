@@ -9,23 +9,23 @@ Last updated: 2026-08-22
 ## Phase 1 — Repository & Infrastructure
 
 ### Repo Setup (branch: feature/repo-setup)
-- [ ] Git repository initialized
-- [ ] Monorepo folder structure created: backend/, frontend/, docker-compose.yml
-- [ ] .gitignore created (covers Python, Node, .env, *.mp4, outputs/, .next/)
-- [ ] README.md skeleton created
-- [ ] docker-compose.yml with postgres and redis services
-- [ ] feature/repo-setup merged to main
+- [x] Git repository initialized
+- [x] Monorepo folder structure created: backend/, frontend/, docker-compose.yml
+- [x] .gitignore created (covers Python, Node, .env, *.mp4, outputs/, .next/)
+- [x] README.md skeleton created
+- [x] docker-compose.yml with postgres and redis services
+- [x] feature/repo-setup merged to main
 
 ### Database Models (branch: feature/db-models)
-- [ ] SQLAlchemy async engine configured
-- [ ] Alembic initialized
-- [ ] User model: id, email, password_hash, role, must_change_password, created_at
-- [ ] Job model: id, user_id, post_id, post_title, status, settings, result_url, error_message, duration_seconds, created_at, updated_at
-- [ ] Asset model: id, filename, category, duration_seconds, file_size_bytes, resolution, enabled, created_at
-- [ ] QuotaUsage model: user_id, period, count
-- [ ] Initial Alembic migration generated and tested
-- [ ] seed.py creates admin@reelbot.local with role=admin, must_change_password=True
-- [ ] feature/db-models merged to main
+- [x] SQLAlchemy async engine configured
+- [x] Alembic initialized
+- [x] User model: id, email, password_hash, role, must_change_password, created_at
+- [x] Job model: id, user_id, post_id, post_title, status, settings, result_url, error_message, duration_seconds, created_at, updated_at
+- [x] Asset model: id, filename, category, duration_seconds, file_size_bytes, resolution, enabled, created_at
+- [x] QuotaUsage model: user_id, period, count
+- [x] Initial Alembic migration generated and tested
+- [x] seed.py creates admin@reelbot.local with role=admin, must_change_password=True
+- [x] feature/db-models merged to main
 
 ---
 
