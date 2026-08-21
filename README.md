@@ -92,7 +92,8 @@ erDiagram
         uuid user_id FK
         text period
         int count
-    }```
+    }
+```
 
 ---
 
@@ -102,10 +103,23 @@ erDiagram
 |---|---|---|
 | Python | 3.11+ | `brew install python@3.11` / `apt install python3.11` |
 | Node.js | LTS | `brew install node` / https://nodejs.org |
-| FFmpeg | **with libass** (see troubleshooting) | `brew install ffmpeg` |
+| FFmpeg | **with libass** (see troubleshooting) | see below |
 | Docker | any recent | https://docker.com |
 
-Check your FFmpeg has subtitles support: `ffmpeg -filters | grep subtitles` — if empty, your build lacks libass and subtitle burning will fail or silently skip.
+### FFmpeg with libass (required for subtitles)
+
+**macOS:**
+```bash
+brew tap homebrew-ffmpeg/ffmpeg
+brew install homebrew-ffmpeg/ffmpeg/ffmpeg
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+apt install ffmpeg   # libass included by default
+```
+
+Verify: `ffmpeg -filters | grep subtitles` — if that returns a line, you're good. If empty, your build lacks libass and subtitle burning will fail.
 
 ## Quick Start (one command)
 
@@ -230,7 +244,7 @@ redditify/
 ├── backend/
 │   ├── main.py             # FastAPI app (lifespan, CORS, routers)
 │   ├── config.py           # pydantic-settings
-│   ├── db.py              # async engine/session
+│   ├── db.py               # async engine/session
 │   ├── sync_db.py          # sync engine (Celery workers)
 │   ├── models.py           # SQLAlchemy models
 │   ├── security.py         # bcrypt, JWT issue/verify, dependencies
@@ -239,11 +253,11 @@ redditify/
 │   ├── routers/            # auth, jobs, assets, quota, admin
 │   ├── services/           # tts, whisper_service, video, title_card,
 │   │                       # assets, storage, jobs, text
-│   ├── tasks/render.py     # Celary pipeline task
+│   ├── tasks/render.py     # Celery pipeline task
 │   ├── assets/gameplay/    # gameplay clips (*.mp4, gitignored)
 │   └── outputs/reels/      # finished videos (gitignored)
 └── frontend/
-    ├── proxy.ts            # route protection (Next 16 middleware→proxy)
+    ├── proxy.ts            # route protection (Next.js middleware)
     ├── auth.ts             # Auth.js v5 credentials provider
     ├── app/                # landing, sign-in/up, change-password,
     │                       # dashboard, jobs, admin
@@ -282,13 +296,14 @@ sequenceDiagram
 | Login rejects `admin@reelbot.local` | pydantic `EmailStr` refuses reserved `.local` TLD | seeded admin is `admin@reelbot.dev` |
 | Celery task errors `got Future attached to a different loop` | async SQLAlchemy pool reused across `asyncio.run()` loops in worker | worker code uses the sync session (`sync_db.py`) — don't call async services from tasks directly |
 | ElevenLabs 400 "api_key_id_used_as_api_key" / "exactly 51 characters" | wrong credential copied | copy the actual key (`sk_…`, 51 chars) from elevenlabs.io profile |
+| FFmpeg installed but `subtitles` filter missing | Homebrew's default FFmpeg formula dropped libass | use the homebrew-ffmpeg tap: `brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg` |
 
 ## API Summary
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/auth/register` | — | `{email, password}` → create account |
-| POST | `/auth/login` | — | → `{token, user{id,email, role, must_change_password}}` |
+| POST | `/auth/login` | — | → `{token, user{id, email, role, must_change_password}}` |
 | POST | `/auth/change-password` | ✓ | `{current_password, new_password}` |
 | GET | `/quota/me` | ✓ | usage vs limits |
 | POST | `/jobs` | ✓ + quota | `{title, story, subreddit?, settings}` → `{job_id}` |
