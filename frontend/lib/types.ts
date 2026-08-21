@@ -33,6 +33,11 @@ export interface AssetList {
   clips: AssetClip[];
 }
 
+export interface AdminJob extends Job {
+  user_id: string;
+  user_email: string | null;
+}
+
 export interface AdminUser {
   id: string;
   email: string;
