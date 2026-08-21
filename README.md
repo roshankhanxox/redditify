@@ -80,7 +80,7 @@ erDiagram
         float duration_seconds
     }
     ASSETS {
-        uuid id
+        uuid id PK
         text filename
         text category
         float duration_seconds
@@ -89,12 +89,10 @@ erDiagram
         boolean enabled
     }
     QUOTA_USAGE {
-        uuid user_id PK
-        text period PK
+        uuid user_id FK
+        text period
         int count
-    }
-}
-```
+    }```
 
 ---
 
