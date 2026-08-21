@@ -1,4 +1,3 @@
-import asyncio
 import os
 import shutil
 import sys
@@ -66,7 +65,7 @@ def generate_reel(self, job_id: str):
         )
 
         set_status("PICKING_GAMEPLAY")
-        clip_path = asyncio.run(assets.pick_clip(cfg.get("gameplay_category", "any")))
+        clip_path = assets.pick_clip_sync(cfg.get("gameplay_category", "any"))
 
         set_status("COMPOSITING_VIDEO")
         output_path = video.render_video(clip_path, audio_path, card_path, srt_path, os.path.join(tmp, "output.mp4"))
