@@ -185,18 +185,20 @@ Last updated: 2026-08-22
 ## Phase 4 — Integration & Polish
 
 ### Integration (branch: feature/integration)
-- [ ] End-to-end flow tested: sign up → search → select → generate → download
-- [ ] ElevenLabs quota exhaustion → edge-tts fallback verified
-- [ ] Free user quota enforcement tested (3rd video works, 4th returns 429)
-- [ ] Admin user has no quota restrictions verified
-- [ ] must_change_password redirect flow tested for admin@reelbot.local
-- [ ] FFmpeg failure stored in error_message and displayed in UI
-- [ ] feature/integration merged to main
+- [x] End-to-end flow tested: sign up → search → select → generate → download
+> Spec pivot: "search" replaced by paste-a-story form; verified repeatedly with real renders.
+- [x] ElevenLabs quota exhaustion → edge-tts fallback verified
+- [x] Free user quota enforcement tested (3rd video works, 4th returns 429)
+- [x] Admin user has no quota restrictions verified
+- [x] must_change_password redirect flow tested for admin@reelbot.dev
+- [x] FFmpeg failure stored in error_message and displayed in UI
+- [x] feature/integration merged to main
 
 ### Documentation (branch: feature/docs)
-- [ ] README.md complete: prerequisites, setup, Reddit API setup guide, seed.py instructions, how to add gameplay clips, docker-compose run instructions
-- [ ] Mermaid diagrams in README: architecture, video generation pipeline, ER diagram
-- [ ] .env.example files for both backend and frontend
-- [ ] PROGRESS.md all checkboxes verified accurate
-- [ ] v1.0.0 tag created
-- [ ] feature/docs merged to main
+- [x] README.md complete: prerequisites, setup, Reddit API setup guide, seed.py instructions, how to add gameplay clips, docker-compose run instructions
+> Spec pivot: Reddit API guide replaced by paste-content docs + run.sh/play.sh launcher guides.
+- [x] Mermaid diagrams in README: architecture, video generation pipeline, ER diagram
+- [x] .env.example files for both backend and frontend
+- [x] PROGRESS.md all checkboxes verified accurate
+- [x] v1.0.0 tag created
+- [x] feature/docs merged to main
