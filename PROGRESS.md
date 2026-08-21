@@ -90,23 +90,23 @@ Last updated: 2026-08-22
 - [x] feature/quota-system merged to main
 
 ### REST API Layer (branch: feature/rest-api)
-- [ ] FastAPI app with lifespan context manager (not deprecated on_event)
-- [ ] JWT decode dependency (get_current_user)
-- [ ] Admin role dependency (require_admin)
-- [ ] POST /jobs (with check_quota dependency)
-- [ ] GET /jobs/{job_id}
-- [ ] GET /jobs (paginated, current user only)
-- [ ] DELETE /jobs/{job_id}
-- [ ] GET /assets (enabled clips, categories)
-- [ ] POST /admin/assets
-- [ ] PATCH /admin/assets/{id}
-- [ ] DELETE /admin/assets/{id} (blocks on last enabled clip)
-- [ ] GET /admin/users (paginated)
-- [ ] PATCH /admin/users/{id}
-- [ ] GET /admin/jobs (paginated)
-- [ ] CORS configured for http://localhost:3000
-- [ ] v0.1.0 tag created after this merge
-- [ ] feature/rest-api merged to main
+- [x] FastAPI app with lifespan context manager (not deprecated on_event)
+- [x] JWT decode dependency (get_current_user)
+- [x] Admin role dependency (require_admin)
+- [x] POST /jobs (with check_quota dependency)
+- [x] GET /jobs/{job_id}
+- [x] GET /jobs (paginated, current user only)
+- [x] DELETE /jobs/{job_id}
+- [x] GET /assets (enabled clips, categories)
+- [x] POST /admin/assets
+- [x] PATCH /admin/assets/{id}
+- [x] DELETE /admin/assets/{id} (blocks on last enabled clip)
+- [x] GET /admin/users (paginated)
+- [x] PATCH /admin/users/{id}
+- [x] GET /admin/jobs (paginated)
+- [x] CORS configured for http://localhost:3000
+- [x] v0.1.0 tag created after this merge
+- [x] feature/rest-api merged to main
 
 ---
 

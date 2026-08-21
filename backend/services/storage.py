@@ -22,3 +22,13 @@ def resolve(key: str) -> str | None:
     if not path.startswith(_root()) or not os.path.exists(path):
         return None
     return path
+
+
+def delete(key: str) -> None:
+    """Remove a stored file if it exists. Never raises."""
+    path = os.path.normpath(os.path.join(_root(), key))
+    if path.startswith(_root()) and os.path.exists(path):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
