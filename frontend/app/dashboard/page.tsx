@@ -249,11 +249,11 @@ export default function DashboardPage() {
 function JobStatusTracker({ jobId, onReset }: { jobId: string; onReset: () => void }) {
   const isTerminal = (s?: string) => s === "DONE" || s === "FAILED";
 
-  const { data: job } = useSWR<Job>(
-    isTerminal(jobStatusCache.get(jobId)) ? null : `/jobs/${jobId}`,
-    fetcher,
-    { refreshInterval: 2000, onSuccess: (d) => jobStatusCache.set(jobId, d.status) },
-  );
+  const { data: job } = useSWR<Job>(`/jobs/${jobId}`, fetcher, {
+    // Poll every 2s while in flight; stop entirely once DONE/FAILED.
+    refreshInterval: (latest) => (latest && isTerminal(latest.status) ? 0 : 2000),
+    revalidateOnFocus: true,
+  });
 
   const status = job?.status ?? "QUEUED";
   const pct = STATUS_STEPS[status] ?? 0;
@@ -302,6 +302,3 @@ function JobStatusTracker({ jobId, onReset }: { jobId: string; onReset: () => vo
     </Card>
   );
 }
-
-// Tracks terminal state so SWR polling stops once a job finishes.
-const jobStatusCache = new Map<string, string>();
