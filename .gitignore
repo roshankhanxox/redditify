@@ -1,1 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Media / outputs
+*.mp4
+outputs/
+tmp/
+
+# Node
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Spec stays local
 redditify.md
