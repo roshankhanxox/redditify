@@ -12,13 +12,16 @@ from security import get_current_user
 from services.jobs import find_active_job
 from services.quota import check_quota, increment_quota
 from services.storage import resolve
+from services.tts import VOICE_CATALOG, VALID_TTS_PROVIDERS
 from tasks.render import generate_reel
 
 router = APIRouter(tags=["jobs"])
 
-VALID_VOICES = ("male", "female", "neutral")
 VALID_TITLE_STYLES = ("dark", "light", "minimal")
 VALID_CATEGORIES = ("any", "minecraft", "subway_surfers", "satisfying", "other")
+
+# legacy ids from the original two-voice spec still resolve
+_LEGACY_VOICES = {"male": "male", "female": "female", "neutral": "rachel"}
 
 
 class JobCreate(BaseModel):
@@ -30,7 +33,15 @@ class JobCreate(BaseModel):
 
 def _sanitize_settings(s: dict) -> dict:
     out = {}
-    out["voice"] = s.get("voice") if s.get("voice") in VALID_VOICES else "male"
+    voice = s.get("voice")
+    voice = _LEGACY_VOICES.get(voice, voice)
+    out["voice"] = voice if voice in VOICE_CATALOG else "male"
+    provider = s.get("tts_provider")
+    out["tts_provider"] = provider if provider in VALID_TTS_PROVIDERS else "auto"
+    try:
+        out["speed"] = max(0.8, min(1.5, float(s.get("speed", 1.1))))
+    except (TypeError, ValueError):
+        out["speed"] = 1.1
     out["title_style"] = s.get("title_style") if s.get("title_style") in VALID_TITLE_STYLES else "dark"
     out["gameplay_category"] = s.get("gameplay_category") if s.get("gameplay_category") in VALID_CATEGORIES else "any"
     try:
