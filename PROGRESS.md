@@ -113,16 +113,16 @@ Last updated: 2026-08-22
 ## Phase 3 — Frontend
 
 ### Frontend Setup (branch: feature/frontend-setup)
-- [ ] Next.js scaffolded with npx create-next-app@latest (no pinned version), TypeScript, Tailwind, App Router
-- [ ] shadcn/ui initialized (dark theme)
-- [ ] shadcn components installed: button, input, card, badge, table, dialog, progress, sonner (toasts), select, slider, separator, avatar, dropdown-menu, skeleton, switch, tabs, radio-group, pagination
-- [ ] NextAuth.js v5 installed and configured (credentials provider)
-- [ ] next-auth session type extended with id, email, role fields
-- [ ] Prisma schema for NextAuth adapter tables
-- [ ] axios instance created in lib/api.ts with base URL and auth header injection
-- [ ] SWR installed
-- [ ] Next.js middleware for protected routes
-- [ ] feature/frontend-setup merged to main
+- [x] Next.js scaffolded with npx create-next-app@latest (no pinned version), TypeScript, Tailwind, App Router
+- [x] shadcn/ui initialized (dark theme)
+- [x] shadcn components installed: button, input, card, badge, table, dialog, progress, sonner (toasts), select, slider, separator, avatar, dropdown-menu, skeleton, switch, tabs, radio-group, pagination
+- [x] NextAuth.js v5 installed and configured (credentials provider)
+- [x] next-auth session type extended with id, email, role fields
+- [x] Prisma schema for NextAuth adapter tables
+- [x] axios instance created in lib/api.ts with base URL and auth header injection
+- [x] SWR installed
+- [x] Next.js middleware for protected routes
+- [x] feature/frontend-setup merged to main
 
 ### Landing Page (branch: feature/landing-page)
 - [ ] Navbar with logo, Sign In, Get Started buttons
