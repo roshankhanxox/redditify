@@ -66,11 +66,11 @@ Last updated: 2026-08-22
 - [x] feature/ffmpeg-pipeline merged to main
 
 ### Asset Manager Service (branch: feature/asset-service)
-- [ ] pick_clip() queries DB for enabled clips by category, returns random path
-- [ ] upload clip endpoint: accepts multipart, validates vertical resolution, min 30s
-- [ ] Auto-transcode to 1080x1920 if needed (subprocess FFmpeg call)
-- [ ] Asset DB record created after successful upload
-- [ ] feature/asset-service merged to main
+- [x] pick_clip() queries DB for enabled clips by category, returns random path
+- [x] upload clip endpoint: accepts multipart, validates vertical resolution, min 30s
+- [x] Auto-transcode to 1080x1920 if needed (subprocess FFmpeg call)
+- [x] Asset DB record created after successful upload
+- [x] feature/asset-service merged to main
 
 ### Celery Jobs (branch: feature/celery-jobs)
 - [ ] Celery app initialized with Redis broker and backend
