@@ -162,14 +162,14 @@ Last updated: 2026-08-22
 - [x] feature/dashboard merged to main
 
 ### Job History (branch: feature/job-history)
-- [ ] Protected route
-- [ ] shadcn Table: Post Title, Subreddit, Status badge, Duration, Created, Actions
-- [ ] Status badges colour-coded: muted/blue/green/red
-- [ ] Download action for DONE jobs
-- [ ] Delete action with confirmation Dialog
-- [ ] Pagination with shadcn Pagination
-- [ ] Empty state with CTA link to /dashboard
-- [ ] feature/job-history merged to main
+- [x] Protected route
+- [x] shadcn Table: Post Title, Subreddit, Status badge, Duration, Created, Actions
+- [x] Status badges colour-coded: muted/blue/green/red
+- [x] Download action for DONE jobs
+- [x] Delete action with confirmation Dialog
+- [x] Pagination with shadcn Pagination
+- [x] Empty state with CTA link to /dashboard
+- [x] feature/job-history merged to main
 
 ### Admin Panel (branch: feature/admin-panel)
 - [ ] Protected + role check (redirect non-admins to /dashboard)
