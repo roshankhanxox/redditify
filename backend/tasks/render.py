@@ -49,7 +49,11 @@ def generate_reel(self, job_id: str):
         set_status("GENERATING_VOICEOVER")
         text = preprocess_text(raw_story, subreddit_label, title, max_words=cfg.get("max_words", 1200))
         audio_path = tts.generate_voiceover(
-            text, cfg.get("voice", "male"), os.path.join(tmp, "voice.mp3")
+            text,
+            cfg.get("voice", "male"),
+            os.path.join(tmp, "voice.mp3"),
+            provider=cfg.get("tts_provider", "auto"),
+            speed=cfg.get("speed", 1.1),
         )
 
         set_status("TRANSCRIBING")

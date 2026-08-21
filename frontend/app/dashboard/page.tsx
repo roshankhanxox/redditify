@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -22,6 +22,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import type { AssetList, Job } from "@/lib/types";
+import { VOICES, TTS_PROVIDERS } from "@/lib/voices";
 
 const STATUS_STEPS: Record<string, number> = {
   QUEUED: 5,
@@ -61,6 +62,8 @@ export default function DashboardPage() {
   const [subreddit, setSubreddit] = useState("");
   const [story, setStory] = useState("");
   const [voice, setVoice] = useState("male");
+  const [ttsProvider, setTtsProvider] = useState("auto");
+  const [speed, setSpeed] = useState(1.1);
   const [titleStyle, setTitleStyle] = useState("dark");
   const [category, setCategory] = useState("any");
   const [durationIdx, setDurationIdx] = useState(2);
@@ -87,6 +90,8 @@ export default function DashboardPage() {
         story,
         settings: {
           voice,
+          tts_provider: ttsProvider,
+          speed,
           title_style: titleStyle,
           gameplay_category: category,
           max_words: DURATIONS[durationIdx].words,
@@ -174,17 +179,58 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
+                <Label>Voice Engine</Label>
+                <RadioGroup
+                  value={ttsProvider}
+                  onValueChange={setTtsProvider}
+                  className="flex flex-col gap-2"
+                >
+                  {TTS_PROVIDERS.map((p) => (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <RadioGroupItem value={p.id} id={`tts-${p.id}`} />
+                      <Label htmlFor={`tts-${p.id}`} className="font-normal">
+                        {p.label}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              <div className="flex flex-col gap-2">
                 <Label>Voice</Label>
                 <Select value={voice} onValueChange={setVoice}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="male">Storyteller Male</SelectItem>
-                    <SelectItem value="female">Storyteller Female</SelectItem>
-                    <SelectItem value="neutral">Neutral</SelectItem>
+                    {["Male", "Female"].map((group) => (
+                      <div key={group}>
+                        <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                          {group}
+                        </p>
+                        {VOICES.filter((v) => v.group === group).map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.label}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <Label>Speech Speed</Label>
+                  <span className="text-sm text-muted-foreground">{speed.toFixed(2)}×</span>
+                </div>
+                <Slider
+                  min={0.8}
+                  max={1.5}
+                  step={0.05}
+                  value={[speed]}
+                  onValueChange={([v]) => setSpeed(v)}
+                />
               </div>
 
               <div className="flex flex-col gap-3">
@@ -249,10 +295,23 @@ export default function DashboardPage() {
 function JobStatusTracker({ jobId, onReset }: { jobId: string; onReset: () => void }) {
   const isTerminal = (s?: string) => s === "DONE" || s === "FAILED";
 
+  // Exponential backoff: 1.5s → 2.25s → 3.4s … capped at 12s. Resets whenever
+  // the status changes (a sign of progress) and stops entirely on terminal.
+  const pollsRef = useRef(0);
+  const lastStatusRef = useRef<string | undefined>(undefined);
+
   const { data: job } = useSWR<Job>(`/jobs/${jobId}`, fetcher, {
-    // Poll every 2s while in flight; stop entirely once DONE/FAILED.
-    refreshInterval: (latest) => (latest && isTerminal(latest.status) ? 0 : 2000),
+    refreshInterval: (latest) => {
+      if (latest && isTerminal(latest.status)) return 0;
+      return Math.min(1500 * Math.pow(1.5, pollsRef.current++), 12000);
+    },
     revalidateOnFocus: true,
+    onSuccess: (d) => {
+      if (d.status !== lastStatusRef.current) {
+        pollsRef.current = 0;
+        lastStatusRef.current = d.status;
+      }
+    },
   });
 
   const status = job?.status ?? "QUEUED";
