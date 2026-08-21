@@ -76,6 +76,24 @@ async def delete_asset(asset_id) -> bool:
         return True
 
 
+def pick_clip_sync(category: str = "any") -> str:
+    """Sync variant for Celery workers (avoids event-loop/pool conflicts)."""
+    from sync_db import SyncSessionLocal
+
+    query = select(Asset).where(Asset.enabled == True)  # noqa: E712
+    if category != "any":
+        query = query.where(Asset.category == category)
+    with SyncSessionLocal() as db:
+        assets = db.scalars(query).all()
+    if not assets:
+        raise RuntimeError(f"No enabled gameplay clips for category '{category}'")
+    chosen = random.choice(list(assets))
+    path = clip_path(chosen.filename)
+    if not os.path.exists(path):
+        raise RuntimeError(f"Clip file missing on disk: {chosen.filename}")
+    return path
+
+
 async def pick_clip(category: str = "any") -> str:
     """Pick a random enabled clip, optionally filtered by category. Returns full path."""
     query = select(Asset).where(Asset.enabled == True)  # noqa: E712
