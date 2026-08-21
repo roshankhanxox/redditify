@@ -55,7 +55,7 @@ def generate_reel(self, job_id: str):
         set_status("TRANSCRIBING")
         words = whisper_service.transcribe(audio_path)
         chunks = whisper_service.words_to_chunks(words)
-        srt_path = whisper_service.chunks_to_srt(chunks, os.path.join(tmp, "subs.srt"))
+        srt_path = whisper_service.chunks_to_ass(chunks, os.path.join(tmp, "subs.ass"))
 
         set_status("RENDERING_TITLE_CARD")
         card_path = title_card.render(
