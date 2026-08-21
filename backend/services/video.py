@@ -52,16 +52,14 @@ def render_video(
     duration = get_duration(audio_path)
 
     # Subtitle file path must use forward slashes and be escaped for FFmpeg filter
-    srt_path = subtitle_file.replace("\\", "/").replace(":", "\\:")
+    sub_path = subtitle_file.replace("\\", "/").replace(":", "\\:")
 
+    # Styling lives entirely inside the .ass subtitle file (PlayRes 1080x1920).
+    # No force_style here — it would override the ASS styles.
     filter_complex = (
         f"[0:v]scale=1080:1920,setsar=1[bg];"
         f"[bg][2:v]overlay=(W-w)/2:80:enable='between(t,0,{duration:.3f})'[titled];"
-        f"[titled]subtitles='{srt_path}':force_style='"
-        "Fontname=Arial,Fontsize=20,Bold=1,"
-        "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-        "Outline=3,Shadow=2,Alignment=2,MarginV=680"
-        "'[final]"
+        f"[titled]subtitles='{sub_path}'[final]"
     )
 
     run_ffmpeg([
