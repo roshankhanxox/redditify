@@ -45,3 +45,39 @@ def chunks_to_srt(chunks: list[dict], path: str) -> str:
     with open(path, "w") as f:
         f.write(content)
     return path
+
+
+def chunks_to_ass(chunks: list[dict], path: str) -> str:
+    """Build an ASS subtitle file with an explicit 1080x1920 play area.
+
+    Plain SRT gets rendered by libass on a default 384x288 canvas, which makes
+    large MarginV values push text off-screen. Declaring PlayRes here keeps
+    MarginV=680 meaning 'about 65% down the 1920px frame' as intended.
+    """
+    def ts(t: float) -> str:
+        cs = int(t * 100)
+        h, cs = divmod(cs, 360_000)
+        m, cs = divmod(cs, 6_000)
+        s, cs = divmod(cs, 100)
+        return f"{h}:{m:02}:{s:02}.{cs:02}"
+
+    header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Reel,Arial,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,3,2,80,80,680,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    lines = []
+    for c in chunks:
+        lines.append(f"Dialogue: 0,{ts(c['start'])},{ts(c['end'])},Reel,,0,0,0,,{c['text']}")
+    with open(path, "w") as f:
+        f.write(header + "\n".join(lines) + "\n")
+    return path
