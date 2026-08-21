@@ -52,18 +52,18 @@ Last updated: 2026-08-22
 - [x] feature/tts-whisper merged to main
 
 ### FFmpeg Pipeline (branch: feature/ffmpeg-pipeline)
-- [ ] run_ffmpeg() helper captures stderr, raises RuntimeError with full output on failure
-- [ ] get_duration() via ffprobe
-- [ ] render_video() with filter_complex: scale + overlay + subtitles
-- [ ] Title card overlaid at top-center (80px from top)
-- [ ] Subtitles positioned at midsection (MarginV=680, Alignment=2)
-- [ ] Gameplay looped via -stream_loop -1 to match audio duration
-- [ ] Output: 1080x1920, 60fps, libx264 CRF 18, AAC 192k, faststart
-- [ ] Pillow title card render: dark/light/minimal styles
-- [ ] Reddit orange (#FF4500) subreddit label on title card
-- [ ] Title word-wrapped at 34 chars, max 4 lines
-- [ ] Inter font files present in backend/fonts/
-- [ ] feature/ffmpeg-pipeline merged to main
+- [x] run_ffmpeg() helper captures stderr, raises RuntimeError with full output on failure
+- [x] get_duration() via ffprobe
+- [x] render_video() with filter_complex: scale + overlay + subtitles
+- [x] Title card overlaid at top-center (80px from top)
+- [x] Subtitles positioned at midsection (MarginV=680, Alignment=2)
+- [x] Gameplay looped via -stream_loop -1 to match audio duration
+- [x] Output: 1080x1920, 60fps, libx264 CRF 18, AAC 192k, faststart
+- [x] Pillow title card render: dark/light/minimal styles
+- [x] Reddit orange (#FF4500) subreddit label on title card
+- [x] Title word-wrapped at 34 chars, max 4 lines
+- [x] Inter font files present in backend/fonts/
+- [x] feature/ffmpeg-pipeline merged to main
 
 ### Asset Manager Service (branch: feature/asset-service)
 - [ ] pick_clip() queries DB for enabled clips by category, returns random path
