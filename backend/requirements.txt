@@ -9,7 +9,7 @@ redis==5.2.*
 praw==7.7.*
 openai-whisper==20240930
 elevenlabs==1.50.*
-edge-tts==6.1.*
+edge-tts==7.2.*
 pillow==11.0.*
 passlib[bcrypt]==1.7.*
 bcrypt==4.0.1
