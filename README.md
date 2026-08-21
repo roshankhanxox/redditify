@@ -98,6 +98,8 @@ erDiagram
 
 _Detailed setup instructions land in Phase 4 (feature/docs). Until then, follow PROGRESS.md._
 
+> **Port note:** if your machine already runs local Postgres/Redis on default ports, this repo's `docker-compose.yml` maps its containers to host ports **5434** (Postgres) and **6380** (Redis) instead of 5432/6379. `backend/.env` points at those.
+
 ## Documentation
 
 Full setup guide, Reddit API credentials walkthrough, seed admin credentials, gameplay clip management, and environment variable reference will be completed in `feature/docs`.
