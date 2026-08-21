@@ -2,7 +2,7 @@
 
 > Agent: read this before doing anything. Find the first unchecked box. That is your next task.
 
-Last updated: 2026-08-22
+Last updated: 2026-08-22 — v1.0.0 tagged. All phases complete.
 
 ---
 
