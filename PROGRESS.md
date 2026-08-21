@@ -82,12 +82,12 @@ Last updated: 2026-08-22
 - [x] feature/celery-jobs merged to main
 
 ### Quota System (branch: feature/quota-system)
-- [ ] check_quota() FastAPI dependency reads QuotaUsage from DB
-- [ ] Admin role bypasses quota (role == "admin" early return)
-- [ ] Returns HTTP 429 with descriptive message when daily or monthly limit exceeded
-- [ ] increment_quota() called on successful job creation
-- [ ] GET /quota/me returns daily_used, daily_limit, monthly_used, monthly_limit
-- [ ] feature/quota-system merged to main
+- [x] check_quota() FastAPI dependency reads QuotaUsage from DB
+- [x] Admin role bypasses quota (role == "admin" early return)
+- [x] Returns HTTP 429 with descriptive message when daily or monthly limit exceeded
+- [x] increment_quota() called on successful job creation
+- [x] GET /quota/me returns daily_used, daily_limit, monthly_used, monthly_limit
+- [x] feature/quota-system merged to main
 
 ### REST API Layer (branch: feature/rest-api)
 - [ ] FastAPI app with lifespan context manager (not deprecated on_event)

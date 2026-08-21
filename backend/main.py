@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import assets, reddit
+from routers import assets, quota, reddit
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ app.add_middleware(
 
 app.include_router(reddit.router)
 app.include_router(assets.router)
+app.include_router(quota.router)
 
 
 @app.get("/health")
