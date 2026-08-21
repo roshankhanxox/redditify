@@ -73,13 +73,13 @@ Last updated: 2026-08-22
 - [x] feature/asset-service merged to main
 
 ### Celery Jobs (branch: feature/celery-jobs)
-- [ ] Celery app initialized with Redis broker and backend
-- [ ] generate_reel task: all 8 steps in correct order
-- [ ] set_status() helper updates job.status in DB within its own session
-- [ ] Job cleanup: tmp directory removed in finally block
-- [ ] max_retries=2, retry delay 30s
-- [ ] Duplicate detection: if job for same post_id already QUEUED or PROCESSING, return existing job_id
-- [ ] feature/celery-jobs merged to main
+- [x] Celery app initialized with Redis broker and backend
+- [x] generate_reel task: all 8 steps in correct order
+- [x] set_status() helper updates job.status in DB within its own session
+- [x] Job cleanup: tmp directory removed in finally block
+- [x] max_retries=2, retry delay 30s
+- [x] Duplicate detection: if job for same post_id already QUEUED or PROCESSING, return existing job_id
+- [x] feature/celery-jobs merged to main
 
 ### Quota System (branch: feature/quota-system)
 - [ ] check_quota() FastAPI dependency reads QuotaUsage from DB
