@@ -29,3 +29,6 @@ out/
 
 # Spec stays local
 redditify.md
+
+# runtime logs
+logs/
