@@ -22,7 +22,9 @@ VALID_CATEGORIES = ("any", "minecraft", "subway_surfers", "satisfying", "other")
 
 
 class JobCreate(BaseModel):
-    post_id: str = Field(min_length=1)
+    title: str = Field(min_length=1, max_length=300)
+    story: str = Field(min_length=1)
+    subreddit: str | None = Field(default=None, max_length=50)
     settings: dict = {}
 
 
@@ -41,8 +43,8 @@ def _sanitize_settings(s: dict) -> dict:
 def job_to_dict(j: Job) -> dict:
     return {
         "id": str(j.id),
-        "post_id": j.post_id,
-        "post_title": j.post_title,
+        "title": j.post_title,
+        "story_excerpt": (j.post_body or "")[:120],
         "status": j.status,
         "settings": j.settings,
         "result_url": j.result_url,
@@ -59,21 +61,22 @@ async def create_job(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    existing = await find_active_job(user.id, body.post_id)
+    existing = await find_active_job(user.id, body.title.strip())
     if existing:
         return {"job_id": str(existing.id), "duplicate": True}
 
     job = Job(
         user_id=user.id,
-        post_id=body.post_id,
+        post_title=body.title.strip(),
+        post_body=body.story.strip(),
         status="QUEUED",
-        settings=_sanitize_settings(body.settings),
+        settings=_sanitize_settings(body.settings) | {"subreddit_label": body.subreddit or ""},
     )
     db.add(job)
     await db.commit()
     await db.refresh(job)
 
-    generate_reel.delay(str(job.id), body.post_id, job.settings)
+    generate_reel.delay(str(job.id))
     await increment_quota(user.id)
 
     return {"job_id": str(job.id), "duplicate": False}
@@ -148,4 +151,5 @@ async def download_job(
     path = resolve(job.result_url)
     if path is None:
         raise HTTPException(410, detail="Result file is gone")
-    return FileResponse(path, media_type="video/mp4", filename=f"reel_{job.post_id}.mp4")
+    safe_title = "".join(c for c in job.post_title[:40] if c.isalnum() or c in (" ", "-")).strip() or "reel"
+    return FileResponse(path, media_type="video/mp4", filename=f"{safe_title}.mp4")
