@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import type { AdminJob, AdminUser, AssetList, JobList } from "@/lib/types";
 import { api } from "@/lib/api";
+import { AppNav } from "@/components/app-nav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,10 +43,12 @@ const fetcher = (url: string) => api.get(url).then((r) => r.data);
 
 export default function AdminPage() {
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
-      </header>
+    <>
+      <AppNav />
+      <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
+        </header>
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -66,7 +69,8 @@ export default function AdminPage() {
           <AllJobsTab />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </>
   );
 }
 

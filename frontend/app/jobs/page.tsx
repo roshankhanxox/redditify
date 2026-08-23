@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import type { JobList } from "@/lib/types";
 import { api } from "@/lib/api";
+import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -63,17 +64,16 @@ export default function JobsPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.per_page)) : 1;
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">My Jobs</h1>
-        <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
-          New Reel
-        </Link>
-      </header>
+    <>
+      <AppNav />
+      <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+        <header className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight">My Jobs</h1>
+        </header>
 
       {!data ? null : data.items.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border py-24 text-center">
-          <p className="text-muted-foreground">You haven't generated any reels yet.</p>
+          <p className="text-muted-foreground">You haven&rsquo;t generated any reels yet.</p>
           <Button asChild>
             <Link href="/dashboard">Create your first reel</Link>
           </Button>
@@ -181,6 +181,7 @@ export default function JobsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </>
   );
 }

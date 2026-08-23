@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -111,13 +112,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Create a Reel</h1>
-        <div className="flex items-center gap-3">
-          <a href="/jobs" className="text-sm text-muted-foreground hover:text-foreground">
-            My Jobs
-          </a>
+    <>
+      <AppNav />
+      <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+        <header className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight">Create a Reel</h1>
           <Badge variant="secondary">
             {quota
               ? quota.unlimited
@@ -125,8 +124,7 @@ export default function DashboardPage() {
                 : `${Math.max(0, quota.daily_limit - quota.daily_used)} videos left today`
               : "..."}
           </Badge>
-        </div>
-      </header>
+        </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* Left — content */}
@@ -288,7 +286,8 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
