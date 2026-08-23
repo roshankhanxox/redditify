@@ -24,7 +24,9 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import type { AssetList, Job } from "@/lib/types";
+import { DEFAULT_RENDER_SETTINGS, type RenderSettings } from "@/lib/types";
 import { VOICES, TTS_PROVIDERS } from "@/lib/voices";
+import { CustomizePanel } from "@/components/customize-panel";
 
 const STATUS_STEPS: Record<string, number> = {
   QUEUED: 5,
@@ -66,7 +68,8 @@ export default function DashboardPage() {
   const [voice, setVoice] = useState("male");
   const [ttsProvider, setTtsProvider] = useState("auto");
   const [speed, setSpeed] = useState(1.1);
-  const [titleStyle, setTitleStyle] = useState("dark");
+  const [expressiveness, setExpressiveness] = useState<"natural" | "expressive" | "dramatic">("expressive");
+  const [render, setRender] = useState<RenderSettings>(DEFAULT_RENDER_SETTINGS);
   const [category, setCategory] = useState("any");
   const [bgSource, setBgSource] = useState<"library" | "user">("library");
   const [backgroundId, setBackgroundId] = useState<string>("");
@@ -100,7 +103,8 @@ export default function DashboardPage() {
           voice,
           tts_provider: ttsProvider,
           speed,
-          title_style: titleStyle,
+          expressiveness,
+          ...render,
           gameplay_category: category,
           gameplay_source: bgSource,
           background_id: bgSource === "user" ? backgroundId : undefined,
@@ -241,19 +245,30 @@ export default function DashboardPage() {
                 />
               </div>
 
-              <div className="flex flex-col gap-3">
-                <Label>Title Card Style</Label>
-                <RadioGroup value={titleStyle} onValueChange={setTitleStyle} className="flex gap-4">
-                  {["dark", "light", "minimal"].map((s) => (
-                    <div key={s} className="flex items-center gap-2">
-                      <RadioGroupItem value={s} id={`style-${s}`} />
-                      <Label htmlFor={`style-${s}`} className="capitalize font-normal">
-                        {s}
-                      </Label>
-                    </div>
+              <div className="flex flex-col gap-2">
+                <Label>Expressiveness</Label>
+                <RadioGroup
+                  value={expressiveness}
+                  onValueChange={(v) => setExpressiveness(v as typeof expressiveness)}
+                  className="flex gap-2"
+                >
+                  {(["natural", "expressive", "dramatic"] as const).map((e) => (
+                    <Label
+                      key={e}
+                      htmlFor={`expr-${e}`}
+                      className="flex flex-1 cursor-pointer items-center justify-center rounded-md border px-2 py-1.5 text-xs font-normal capitalize transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/10"
+                    >
+                      <RadioGroupItem value={e} id={`expr-${e}`} className="sr-only" />
+                      {e}
+                    </Label>
                   ))}
                 </RadioGroup>
               </div>
+
+              <CustomizePanel
+                value={render}
+                onChange={(patch) => setRender((r) => ({ ...r, ...patch }))}
+              />
 
               <div className="flex flex-col gap-3">
                 <Label>Gameplay Background</Label>

@@ -77,6 +77,8 @@ def generate_reel(self, job_id: str):
             user_id = str(job.user_id)
 
         subreddit_label = cfg.get("subreddit_label") or "reelbot"
+        captions_on = bool(cfg.get("captions_enabled", True))
+        title_on = bool(cfg.get("title_enabled", True))
 
         # Resume fast-path: on a retry, restore whatever artifacts survived in
         # scratch and skip those stages. Anything missing regenerates normally.
@@ -90,24 +92,32 @@ def generate_reel(self, job_id: str):
                 voice_path,
                 provider=cfg.get("tts_provider", "auto"),
                 speed=cfg.get("speed", 1.1),
+                expressiveness=cfg.get("expressiveness", "expressive"),
             )
             storage.upload(audio_path, _scratch_key(job_id, "voice.mp3"), keep_local=True)
 
         srt_path = os.path.join(tmp, "subs.ass")
-        if storage.download(_scratch_key(job_id, "subs.ass"), srt_path) is None:
+        if captions_on and storage.download(_scratch_key(job_id, "subs.ass"), srt_path) is None:
             set_status("TRANSCRIBING")
             words = whisper_service.transcribe(voice_path)
-            chunks = whisper_service.words_to_chunks(words)
-            whisper_service.chunks_to_ass(chunks, srt_path)
+            try:
+                chunk_size = max(1, min(3, int(cfg.get("caption_words", 2))))
+            except (TypeError, ValueError):
+                chunk_size = 2
+            chunks = whisper_service.words_to_chunks(words, chunk_size=chunk_size)
+            style = whisper_service.caption_style_from_settings(cfg)
+            whisper_service.chunks_to_ass(chunks, srt_path, style=style)
             storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
 
         card_path = os.path.join(tmp, "title.png")
-        if storage.download(_scratch_key(job_id, "title.png"), card_path) is None:
+        if title_on and storage.download(_scratch_key(job_id, "title.png"), card_path) is None:
             set_status("RENDERING_TITLE_CARD")
             title_card.render(
                 title, subreddit_label,
                 cfg.get("title_style", "dark"),
                 card_path,
+                scale_pct=cfg.get("title_scale", 100),
+                show_badge=bool(cfg.get("title_badge", True)),
             )
             storage.upload(card_path, _scratch_key(job_id, "title.png"), keep_local=True)
 
@@ -115,7 +125,14 @@ def generate_reel(self, job_id: str):
         clip_path = assets.pick_clip_for_job_sync(user_id, cfg)
 
         set_status("COMPOSITING_VIDEO")
-        output_path = video.render_video(clip_path, voice_path, card_path, srt_path, os.path.join(tmp, "output.mp4"))
+        output_path = video.render_video(
+            clip_path,
+            voice_path,
+            os.path.join(tmp, "output.mp4"),
+            card=card_path if title_on else None,
+            subs=srt_path if captions_on else None,
+            card_pos=cfg.get("title_position", "top"),
+        )
         duration = video.get_duration(output_path)
 
         set_status("UPLOADING")

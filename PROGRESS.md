@@ -202,3 +202,19 @@ Last updated: 2026-08-22 — v1.0.0 tagged. All phases complete.
 - [x] PROGRESS.md all checkboxes verified accurate
 - [x] v1.0.0 tag created
 - [x] feature/docs merged to main
+
+---
+
+## Post-v1 Features
+
+### S3 storage & retention (merged via feature/s3-storage-and-retention)
+- [x] Dual-backend storage adapter, presigned downloads, scratch artifacts, lifecycle reaper
+
+### Expressiveness + render customizations (branch: feature/expressiveness-render-customizations)
+- [x] TTS expressiveness knob (natural / expressive / dramatic): ElevenLabs voice_settings + edge-tts prosody contour
+- [x] Caption knobs: font size (48–140), position lower/center/upper, color white/yellow/brand, outline 0–12, words-per-screen 1–3, captions toggle
+- [x] Title card knobs: enable toggle, top/bottom position, scale 60–130%, subreddit badge toggle, ellipsis truncation past 4 lines
+- [x] Server-side sanitizer clamps/enums for every new key; defaults byte-match legacy output
+- [x] Disabled layers skip their pipeline stages entirely (no whisper when captions off, no card render/upload)
+- [x] Dashboard "Customize look" panel with live 9:16 CSS preview, reset-to-defaults
+- [x] Golden ASS tests + sanitizer tests + ffmpeg corner-case render matrix (backend/tests/)

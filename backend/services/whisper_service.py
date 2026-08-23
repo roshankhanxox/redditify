@@ -1,5 +1,56 @@
 import whisper
 
+# PlayRes is 1080x1920 (declared in chunks_to_ass); MarginV values below land
+# the caption block ~65% / center / upper-third down the frame.
+CAPTION_POSITION_MARGIN_V = {"lower": 680, "center": 860, "upper": 1180}
+
+# ASS PrimaryColour is &H00BBGGRR. yellow = ffmpeg gold, brand = Reddit orange.
+CAPTION_COLOR_PRIMARY = {
+    "white": "&H00FFFFFF",
+    "yellow": "&H0000E5FF",
+    "brand": "&H002A45FF",
+}
+
+DEFAULT_CAPTION_STYLE = {
+    "fontname": "Arial",
+    "fontsize": 96,
+    "primary": CAPTION_COLOR_PRIMARY["white"],
+    "outline_colour": "&H00000000",
+    "outline": 6,
+    "shadow": 3,
+    "alignment": 2,
+    "margin_v": CAPTION_POSITION_MARGIN_V["lower"],
+}
+
+
+def caption_style_from_settings(cfg: dict | None) -> dict:
+    """Resolve sanitized job settings into a full ASS style dict.
+
+    Re-clamps defensively so callers that bypass the API sanitizer (scripts,
+    manual scratch resumes) still produce safe numeric/enum values.
+    """
+    cfg = cfg or {}
+    try:
+        fontsize = max(48, min(140, int(cfg.get("caption_font_size", DEFAULT_CAPTION_STYLE["fontsize"]))))
+    except (TypeError, ValueError):
+        fontsize = DEFAULT_CAPTION_STYLE["fontsize"]
+    try:
+        outline = max(0, min(12, int(cfg.get("caption_outline", DEFAULT_CAPTION_STYLE["outline"]))))
+    except (TypeError, ValueError):
+        outline = DEFAULT_CAPTION_STYLE["outline"]
+    return {
+        **DEFAULT_CAPTION_STYLE,
+        "fontsize": fontsize,
+        "outline": outline,
+        "margin_v": CAPTION_POSITION_MARGIN_V.get(
+            cfg.get("caption_position"), DEFAULT_CAPTION_STYLE["margin_v"]
+        ),
+        "primary": CAPTION_COLOR_PRIMARY.get(
+            cfg.get("caption_color"), DEFAULT_CAPTION_STYLE["primary"]
+        ),
+    }
+
+
 _model = None  # Singleton — loaded once per worker process
 
 
@@ -47,12 +98,16 @@ def chunks_to_srt(chunks: list[dict], path: str) -> str:
     return path
 
 
-def chunks_to_ass(chunks: list[dict], path: str) -> str:
+def chunks_to_ass(chunks: list[dict], path: str, style: dict | None = None) -> str:
     """Build an ASS subtitle file with an explicit 1080x1920 play area.
 
     Plain SRT gets rendered by libass on a default 384x288 canvas, which makes
     large MarginV values push text off-screen. Declaring PlayRes here keeps
     MarginV=680 meaning 'about 65% down the 1920px frame' as intended.
+
+    `style` is an optional partial dict merged over DEFAULT_CAPTION_STYLE; only
+    the templated fields below are honored, so arbitrary keys (e.g. a hostile
+    fontname) can never reach the Style line.
     """
     def ts(t: float) -> str:
         cs = int(t * 100)
@@ -61,7 +116,15 @@ def chunks_to_ass(chunks: list[dict], path: str) -> str:
         s, cs = divmod(cs, 100)
         return f"{h}:{m:02}:{s:02}.{cs:02}"
 
-    header = """[Script Info]
+    s = {**DEFAULT_CAPTION_STYLE, **(style or {})}
+    style_line = (
+        f"Style: Reel,{s['fontname']},{int(s['fontsize'])},"
+        f"{s['primary']},{s['primary']},{s['outline_colour']},&H80000000,"
+        f"-1,0,0,0,100,100,0,0,1,{int(s['outline'])},{int(s['shadow'])},"
+        f"{int(s['alignment'])},80,80,{int(s['margin_v'])},1"
+    )
+
+    header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
@@ -70,7 +133,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Reel,Arial,96,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,6,3,2,80,80,680,1
+{style_line}
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
