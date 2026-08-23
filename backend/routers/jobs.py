@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from db import get_db
-from models import Job, User
+from models import Job, User, UserBackground
 from security import get_current_user
 from services.jobs import find_active_job
 from services.quota import check_quota, increment_quota
@@ -45,6 +45,10 @@ def _sanitize_settings(s: dict) -> dict:
         out["speed"] = 1.1
     out["title_style"] = s.get("title_style") if s.get("title_style") in VALID_TITLE_STYLES else "dark"
     out["gameplay_category"] = s.get("gameplay_category") if s.get("gameplay_category") in VALID_CATEGORIES else "any"
+    source = s.get("gameplay_source")
+    out["gameplay_source"] = source if source in ("library", "user") else "library"
+    if out["gameplay_source"] == "user":
+        out["background_id"] = str(s.get("background_id") or "")
     try:
         out["max_words"] = max(50, min(2000, int(s.get("max_words", 1200))))
     except (TypeError, ValueError):
@@ -77,12 +81,25 @@ async def create_job(
     if existing:
         return {"job_id": str(existing.id), "duplicate": True}
 
+    job_settings = _sanitize_settings(body.settings)
+    if job_settings.get("gameplay_source") == "user":
+        # Ownership + readiness are validated here AND re-checked in the worker.
+        try:
+            bg_id = uuid.UUID(job_settings.get("background_id") or "")
+        except ValueError:
+            raise HTTPException(422, detail="Invalid background id")
+        bg = await db.get(UserBackground, bg_id)
+        if bg is None or bg.user_id != user.id:
+            raise HTTPException(403, detail="Not your background")
+        if bg.status != "ready":
+            raise HTTPException(422, detail="Background is not ready")
+
     job = Job(
         user_id=user.id,
         post_title=body.title.strip(),
         post_body=body.story.strip(),
         status="QUEUED",
-        settings=_sanitize_settings(body.settings) | {"subreddit_label": body.subreddit or ""},
+        settings=job_settings | {"subreddit_label": body.subreddit or ""},
     )
     db.add(job)
     await db.commit()

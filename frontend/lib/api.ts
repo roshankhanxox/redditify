@@ -1,4 +1,5 @@
 import axios from "axios"
+import type { UserBackground } from "./types"
 
 /**
  * Thin axios client pointed at the Next.js proxy layer.
@@ -44,4 +45,81 @@ export async function downloadReel(jobId: string, fallbackName = "reel.mp4") {
   anchor.click()
   anchor.remove()
   URL.revokeObjectURL(objectUrl)
+}
+
+/* ------------------------------------------------------------------ */
+/* User background footage (plan.md phase 2)                           */
+/* ------------------------------------------------------------------ */
+
+export interface BackgroundInit {
+  id: string
+  label: string
+  status: string
+  part_size: number
+  parts: { part_number: number; url: string }[]
+}
+
+/**
+ * Raw XHR PUT of one multipart part. Deliberately sends NO Content-Type
+ * header (part URLs are signed without one); a Blob without a mime type
+ * keeps browsers from adding it.
+ */
+function putPart(url: string, blob: Blob, onProgress: (loadedDelta: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open("PUT", url)
+    let last = 0
+    xhr.upload.onprogress = (e) => {
+      onProgress(e.loaded - last)
+      last = e.loaded
+    }
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`))
+    xhr.onerror = () => reject(new Error("Network error during upload"))
+    xhr.send(blob)
+  })
+}
+
+export interface UploadHooks {
+  onPhase?: (phase: "uploading" | "processing") => void
+  onProgress?: (fraction: number) => void
+}
+
+/**
+ * Full background upload orchestration:
+ * init -> parallel-safe sequential part PUTs -> complete -> poll until ready/failed.
+ * Presigned part URLs live only inside this call chain.
+ */
+export async function uploadBackground(file: File, hooks: UploadHooks = {}): Promise<UserBackground> {
+  if (file.size === 0) throw new Error("Empty file")
+  const contentType = file.type || "video/mp4"
+  hooks.onPhase?.("uploading")
+
+  const init = await api
+    .post<BackgroundInit>("/backgrounds/init", {
+      label: file.name.slice(0, 80),
+      size_bytes: file.size,
+      content_type: contentType,
+    })
+    .then((r) => r.data)
+
+  let uploaded = 0
+  for (const part of init.parts) {
+    const start = (part.part_number - 1) * init.part_size
+    // Strip the mime type so no Content-Type header is sent.
+    const chunk = new Blob([file.slice(start, start + init.part_size)])
+    await putPart(part.url, chunk, (delta) => hooks.onProgress?.((uploaded + delta) / file.size))
+    uploaded += chunk.size
+  }
+
+  hooks.onPhase?.("processing")
+  await api.post(`/backgrounds/${init.id}/complete`)
+
+  // Poll until the probe/transcode task settles (bounded ~5 min).
+  for (let i = 0; i < 100; i++) {
+    await new Promise((r) => setTimeout(r, i < 5 ? 1500 : 3000))
+    const bg = await api.get<UserBackground>(`/backgrounds/${init.id}`).then((r) => r.data)
+    if (bg.status === "ready" || bg.status === "failed") return bg
+  }
+  throw new Error("Processing timed out — check My footage in a minute")
 }

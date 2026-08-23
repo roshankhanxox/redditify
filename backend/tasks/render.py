@@ -43,6 +43,7 @@ def generate_reel(self, job_id: str):
             title = job.post_title
             raw_story = job.post_body
             cfg = job.settings or {}
+            user_id = str(job.user_id)
 
         subreddit_label = cfg.get("subreddit_label") or "reelbot"
 
@@ -69,14 +70,14 @@ def generate_reel(self, job_id: str):
         )
 
         set_status("PICKING_GAMEPLAY")
-        clip_path = assets.pick_clip_sync(cfg.get("gameplay_category", "any"))
+        clip_path = assets.pick_clip_for_job_sync(user_id, cfg)
 
         set_status("COMPOSITING_VIDEO")
         output_path = video.render_video(clip_path, audio_path, card_path, srt_path, os.path.join(tmp, "output.mp4"))
         duration = video.get_duration(output_path)
 
         set_status("UPLOADING")
-        result_key = storage.upload(output_path, f"reels/{job_id}.mp4")
+        result_key = storage.upload(output_path, f"users/{user_id}/reels/{job_id}.mp4")
 
         set_status("DONE", result_url=result_key, duration_seconds=duration)
 

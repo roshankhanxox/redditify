@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import { api, downloadReel } from "@/lib/api";
 import { AppNav } from "@/components/app-nav";
+import { UserBackgroundPanel } from "@/components/background-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -67,6 +68,8 @@ export default function DashboardPage() {
   const [speed, setSpeed] = useState(1.1);
   const [titleStyle, setTitleStyle] = useState("dark");
   const [category, setCategory] = useState("any");
+  const [bgSource, setBgSource] = useState<"library" | "user">("library");
+  const [backgroundId, setBackgroundId] = useState<string>("");
   const [durationIdx, setDurationIdx] = useState(2);
   const [jobId, setJobId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -83,6 +86,8 @@ export default function DashboardPage() {
   function generate() {
     if (!title.trim()) return toast.error("Give your reel a title");
     if (!story.trim()) return toast.error("Paste a story first");
+    if (bgSource === "user" && !backgroundId)
+      return toast.error("Pick or upload your own footage first");
     setCreating(true);
     api
       .post<{ job_id: string; duplicate: boolean }>("/jobs", {
@@ -95,6 +100,8 @@ export default function DashboardPage() {
           speed,
           title_style: titleStyle,
           gameplay_category: category,
+          gameplay_source: bgSource,
+          background_id: bgSource === "user" ? backgroundId : undefined,
           max_words: DURATIONS[durationIdx].words,
         },
       })
@@ -245,20 +252,43 @@ export default function DashboardPage() {
                 </RadioGroup>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <Label>Gameplay Background</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(assetData?.categories ?? ["any"]).map((c) => (
-                      <SelectItem key={c} value={c} className="capitalize">
-                        {c === "any" ? "Any" : c.replace("_", " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <RadioGroup
+                  value={bgSource}
+                  onValueChange={(v) => setBgSource(v as "library" | "user")}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="library" id="bgsrc-library" />
+                    <Label htmlFor="bgsrc-library" className="font-normal">
+                      Library
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="user" id="bgsrc-user" />
+                    <Label htmlFor="bgsrc-user" className="font-normal">
+                      My footage
+                    </Label>
+                  </div>
+                </RadioGroup>
+
+                {bgSource === "library" ? (
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(assetData?.categories ?? ["any"]).map((c) => (
+                        <SelectItem key={c} value={c} className="capitalize">
+                          {c === "any" ? "Any" : c.replace("_", " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <UserBackgroundPanel value={backgroundId || undefined} onChange={setBackgroundId} />
+                )}
               </div>
 
               <div className="flex flex-col gap-3">

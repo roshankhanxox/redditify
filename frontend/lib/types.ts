@@ -33,6 +33,21 @@ export interface AssetList {
   clips: AssetClip[];
 }
 
+export interface UserBackground {
+  id: string;
+  label: string;
+  status: "pending" | "processing" | "ready" | "failed";
+  duration_seconds: number | null;
+  file_size_bytes: number | null;
+  resolution: string | null;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface UserBackgroundList {
+  items: UserBackground[];
+}
+
 export interface AdminJob extends Job {
   user_id: string;
   user_email: string | null;

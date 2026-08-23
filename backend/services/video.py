@@ -42,6 +42,18 @@ def transcode_vertical(src: str, dst: str) -> str:
     return dst
 
 
+def render_preview(src: str, dst: str) -> str:
+    """Low-quality 360x640 silent preview for cheap in-app playback."""
+    run_ffmpeg([
+        "-i", src,
+        "-vf", "scale=360:640:force_original_aspect_ratio=increase,crop=360:640,setsar=1",
+        "-c:v", "libx264", "-crf", "32", "-preset", "veryfast",
+        "-an", "-movflags", "+faststart",
+        dst,
+    ])
+    return dst
+
+
 def render_video(
     gameplay_clip: str,
     audio_path: str,

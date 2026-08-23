@@ -26,9 +26,15 @@ def _s3():
 
                 kwargs = {"region_name": settings.S3_REGION}
                 if settings.S3_ENDPOINT_URL:
-                    # MinIO and other S3-compatible stores need path-style addressing.
+                    # MinIO and other S3-compatible stores need path-style
+                    # addressing and explicit SigV4 — otherwise botocore falls
+                    # back to SigV2 query auth, which breaks presigned uploads
+                    # whenever the browser sends a Content-Type header.
                     kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
-                    kwargs["config"] = Config(s3={"addressing_style": "path"})
+                    kwargs["config"] = Config(
+                        s3={"addressing_style": "path"},
+                        signature_version="s3v4",
+                    )
                 if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
                     kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
                     kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
@@ -163,6 +169,17 @@ def complete_multipart(key: str, upload_id: str, parts: list[dict]) -> None:
         UploadId=upload_id,
         MultipartUpload={"Parts": sorted(parts, key=lambda p: p["PartNumber"])},
     )
+
+
+def list_parts(key: str, upload_id: str) -> list[dict]:
+    """Server-side listing of uploaded parts. Used instead of trusting
+    client-supplied part/ETag lists on complete."""
+    parts = []
+    paginator = _s3().get_paginator("list_parts")
+    for page in paginator.paginate(Bucket=settings.S3_BUCKET, Key=key, UploadId=upload_id):
+        for p in page.get("Parts", []):
+            parts.append({"PartNumber": p["PartNumber"], "ETag": p["ETag"]})
+    return parts
 
 
 def abort_multipart(key: str, upload_id: str) -> None:
