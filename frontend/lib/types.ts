@@ -4,7 +4,9 @@ export interface Job {
   story_excerpt: string;
   status: string;
   settings: Record<string, unknown>;
+  retention: string;
   result_url: string | null;
+  result_expires_at: string | null;
   error_message: string | null;
   duration_seconds: number | null;
   created_at: string;
@@ -57,6 +59,7 @@ export interface AdminUser {
   id: string;
   email: string;
   role: string;
+  plan: string;
   must_change_password: boolean;
   created_at: string;
   quota: {

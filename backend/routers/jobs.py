@@ -49,6 +49,8 @@ def _sanitize_settings(s: dict) -> dict:
     out["gameplay_source"] = source if source in ("library", "user") else "library"
     if out["gameplay_source"] == "user":
         out["background_id"] = str(s.get("background_id") or "")
+    retention = s.get("retention")
+    out["retention"] = retention if retention in ("ephemeral", "retain") else "ephemeral"
     try:
         out["max_words"] = max(50, min(2000, int(s.get("max_words", 1200))))
     except (TypeError, ValueError):
@@ -63,7 +65,9 @@ def job_to_dict(j: Job) -> dict:
         "story_excerpt": (j.post_body or "")[:120],
         "status": j.status,
         "settings": j.settings,
+        "retention": getattr(j, "retention", None) or "ephemeral",
         "result_url": j.result_url,
+        "result_expires_at": j.result_expires_at.isoformat() if j.result_expires_at else None,
         "error_message": j.error_message,
         "duration_seconds": j.duration_seconds,
         "created_at": j.created_at.isoformat() if j.created_at else None,
@@ -94,11 +98,18 @@ async def create_job(
         if bg.status != "ready":
             raise HTTPException(422, detail="Background is not ready")
 
+    retention = job_settings.pop("retention", "ephemeral")
+    if retention == "retain":
+        plan = getattr(user, "plan", "free") or "free"
+        if not (user.role == "admin" or plan == "premium"):
+            raise HTTPException(403, detail="Retain requires a premium plan")
+
     job = Job(
         user_id=user.id,
         post_title=body.title.strip(),
         post_body=body.story.strip(),
         status="QUEUED",
+        retention=retention,
         settings=job_settings | {"subreddit_label": body.subreddit or ""},
     )
     db.add(job)

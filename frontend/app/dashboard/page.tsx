@@ -70,17 +70,19 @@ export default function DashboardPage() {
   const [category, setCategory] = useState("any");
   const [bgSource, setBgSource] = useState<"library" | "user">("library");
   const [backgroundId, setBackgroundId] = useState<string>("");
+  const [retention, setRetention] = useState<"ephemeral" | "retain">("ephemeral");
   const [durationIdx, setDurationIdx] = useState(2);
   const [jobId, setJobId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const wordCount = story.trim() ? story.trim().split(/\s+/).length : 0;
 
-  const { data: quota } = useSWR<{ daily_used: number; daily_limit: number; unlimited?: boolean }>(
+  const { data: quota } = useSWR<{ daily_used: number; daily_limit: number; unlimited?: boolean; plan?: string }>(
     session ? "/quota/me" : null,
     fetcher,
     { refreshInterval: 30_000 },
   );
+  const canRetain = session?.user?.role === "admin" || quota?.plan === "premium";
   const { data: assetData } = useSWR<AssetList>(session ? "/assets" : null, fetcher);
 
   function generate() {
@@ -102,6 +104,7 @@ export default function DashboardPage() {
           gameplay_category: category,
           gameplay_source: bgSource,
           background_id: bgSource === "user" ? backgroundId : undefined,
+          retention,
           max_words: DURATIONS[durationIdx].words,
         },
       })
@@ -307,7 +310,36 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {jobId ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <Label>Keep the finished file?</Label>
+                  {!canRetain && (
+                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                      premium
+                    </Badge>
+                  )}
+                </div>
+                <RadioGroup
+                  value={retention}
+                  onValueChange={(v) => setRetention(v as "ephemeral" | "retain")}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="ephemeral" id={`ret-${"ephemeral"}`} />
+                    <Label htmlFor={`ret-${"ephemeral"}`} className="font-normal">
+                      Auto-delete (~15 min)
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="retain" id="ret-retain" disabled={!canRetain} />
+                    <Label htmlFor="ret-retain" className={`font-normal ${canRetain ? "" : "opacity-50"}`}>
+                      Keep until I delete
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {jobId ? (
             <JobStatusTracker jobId={jobId} onReset={reset} />
           ) : (
             <Button size="lg" className="w-full" onClick={generate} disabled={creating}>

@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from celery import Celery
 
@@ -12,6 +13,17 @@ from config import settings
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 celery = Celery("reelbot", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
+
+# Beat schedule + worker-side task registration. Tasks live in tasks/maintenance;
+# `include` makes the worker import them at startup so beat messages always
+# find a registered consumer.
+celery.conf.include = ["tasks.maintenance"]
+celery.conf.beat_schedule = {
+    "reap-expired-reels": {"task": "tasks.maintenance.reap_expired_reels", "schedule": 60.0},
+    "sweep-stale-uploads": {"task": "tasks.maintenance.sweep_stale_uploads", "schedule": 3600.0},
+    "sweep-worker-tmp": {"task": "tasks.maintenance.sweep_worker_tmp", "schedule": 3600.0},
+    "sweep-orphan-objects": {"task": "tasks.maintenance.sweep_orphan_objects", "schedule": 7 * 24 * 3600.0},
+}
 
 
 @celery.task(bind=True, max_retries=2, default_retry_delay=30)
@@ -79,7 +91,13 @@ def generate_reel(self, job_id: str):
         set_status("UPLOADING")
         result_key = storage.upload(output_path, f"users/{user_id}/reels/{job_id}.mp4")
 
-        set_status("DONE", result_url=result_key, duration_seconds=duration)
+        # Retention clock starts when the file is durably stored. The server
+        # owns the clock; clients only ever receive the timestamp.
+        expires_at = None
+        if (cfg.get("retention") or "ephemeral") == "ephemeral":
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.RETENTION_TTL_MINUTES)
+
+        set_status("DONE", result_url=result_key, duration_seconds=duration, result_expires_at=expires_at)
 
     except Exception as exc:
         # Auto-retry (max_retries=2, 30s delay) only fires for transient network

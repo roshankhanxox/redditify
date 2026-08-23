@@ -69,8 +69,8 @@ start_all() {
   say "Launching FastAPI on :8000..."
   (cd backend && nohup ./.venv/bin/python -m uvicorn main:app --port 8000 > ../logs/api.log 2>&1 & echo $! > /tmp/reelbot/api.pid)
 
-  say "Launching Celery worker..."
-  (cd backend && nohup ./.venv/bin/celery -A tasks.render worker -l info --pool=solo --concurrency=1 > ../logs/worker.log 2>&1 & echo $! > /tmp/reelbot/worker.pid)
+  say "Launching Celery worker (with embedded beat)..."
+  (cd backend && nohup ./.venv/bin/celery -A tasks.render worker -l info --pool=solo --concurrency=1 -B > ../logs/worker.log 2>&1 & echo $! > /tmp/reelbot/worker.pid)
 
   say "Launching Next.js on :3000..."
   (cd frontend && nohup npm run dev -- -p 3000 > ../logs/next.log 2>&1 & echo $! > /tmp/reelbot/next.pid)

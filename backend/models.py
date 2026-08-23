@@ -15,6 +15,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(Text, nullable=False, default="free")
+    plan: Mapped[str] = mapped_column(Text, nullable=False, default="free")  # 'free' | 'premium'
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -28,7 +29,10 @@ class Job(Base):
     post_body: Mapped[str] = mapped_column(Text, nullable=False, default="")
     status: Mapped[str] = mapped_column(Text, nullable=False, default="QUEUED")
     settings: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    retention: Mapped[str] = mapped_column(Text, nullable=False, default="ephemeral")  # ephemeral|retain
     result_url: Mapped[str | None] = mapped_column(Text)
+    result_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    result_expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
     duration_seconds: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

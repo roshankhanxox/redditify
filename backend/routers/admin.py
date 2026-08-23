@@ -17,6 +17,7 @@ router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(requir
 
 class UserPatch(BaseModel):
     role: str | None = None
+    plan: str | None = None
     reset_quota: bool = False
 
 
@@ -38,6 +39,7 @@ async def list_users(page: int = 1, per_page: int = 10, db: AsyncSession = Depen
             "id": str(u.id),
             "email": u.email,
             "role": u.role,
+            "plan": getattr(u, "plan", "free"),
             "must_change_password": u.must_change_password,
             "created_at": u.created_at.isoformat(),
             "quota": {
@@ -59,6 +61,10 @@ async def patch_user(user_id: uuid.UUID, body: UserPatch, db: AsyncSession = Dep
         if body.role not in ("free", "admin"):
             raise HTTPException(422, detail="role must be 'free' or 'admin'")
         user.role = body.role
+    if body.plan is not None:
+        if body.plan not in ("free", "premium"):
+            raise HTTPException(422, detail="plan must be 'free' or 'premium'")
+        user.plan = body.plan
     if body.reset_quota:
         await db.execute(
             QuotaUsage.__table__.delete().where(
@@ -67,7 +73,12 @@ async def patch_user(user_id: uuid.UUID, body: UserPatch, db: AsyncSession = Dep
             )
         )
     await db.commit()
-    return {"id": str(user.id), "role": user.role, "quota_reset": body.reset_quota}
+    return {
+        "id": str(user.id),
+        "role": user.role,
+        "plan": getattr(user, "plan", "free"),
+        "quota_reset": body.reset_quota,
+    }
 
 
 @router.get("/jobs")
