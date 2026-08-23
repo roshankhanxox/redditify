@@ -184,7 +184,9 @@ export default function DashboardPage() {
         </Card>
 
         {/* Right — settings + generation */}
-        <div className="flex flex-col gap-6 lg:col-span-2">
+        {/* Right — settings + generation; capped to the viewport and scrolled
+            internally on lg+ so expanding panels don't stretch the page */}
+        <div className="flex flex-col gap-6 lg:col-span-2 lg:sticky lg:top-[4.5rem] lg:max-h-[calc(100vh-5.5rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
           <Card>
             <CardHeader>
               <CardTitle>Settings</CardTitle>
