@@ -6,12 +6,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import settings
 from db import get_db
 from models import Job, User
 from security import get_current_user
 from services.jobs import find_active_job
 from services.quota import check_quota, increment_quota
-from services.storage import resolve
+from services.storage import presign_get, resolve
 from services.tts import VOICE_CATALOG, VALID_TTS_PROVIDERS
 from tasks.render import generate_reel
 
@@ -159,8 +160,17 @@ async def download_job(
     job = await _get_job_checked(job_id, user, db)
     if job.status != "DONE" or not job.result_url:
         raise HTTPException(409, detail="Job has no downloadable result")
+    safe_title = "".join(c for c in job.post_title[:40] if c.isalnum() or c in (" ", "-")).strip() or "reel"
+    if settings.STORAGE_BACKEND == "s3":
+        # Presigned URL minted only after the ownership check above; forces
+        # attachment disposition so nothing renders inline or sniffs content types.
+        url = presign_get(
+            job.result_url,
+            settings.DOWNLOAD_SIGNED_TTL_SECONDS,
+            filename=f"{safe_title}.mp4",
+        )
+        return {"url": url, "expires_in": settings.DOWNLOAD_SIGNED_TTL_SECONDS}
     path = resolve(job.result_url)
     if path is None:
         raise HTTPException(410, detail="Result file is gone")
-    safe_title = "".join(c for c in job.post_title[:40] if c.isalnum() or c in (" ", "-")).strip() or "reel"
     return FileResponse(path, media_type="video/mp4", filename=f"{safe_title}.mp4")

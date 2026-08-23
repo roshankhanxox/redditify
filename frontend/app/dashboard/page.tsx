@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, downloadReel } from "@/lib/api";
 import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -321,10 +321,8 @@ function JobStatusTracker({ jobId, onReset }: { jobId: string; onReset: () => vo
       <Card>
         <CardContent className="flex flex-col gap-3 p-6">
           <p className="font-medium text-center">Your reel is ready!</p>
-          <Button asChild className="w-full">
-            <a href={`/api/proxy/jobs/${jobId}/download`} download>
-              Download MP4
-            </a>
+          <Button className="w-full" onClick={() => downloadReel(jobId, "reel.mp4")}>
+            Download MP4
           </Button>
           <Button variant="outline" className="w-full" onClick={onReset}>
             Generate Another

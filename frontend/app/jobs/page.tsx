@@ -5,7 +5,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { toast } from "sonner";
 import type { JobList } from "@/lib/types";
-import { api } from "@/lib/api";
+import { api, downloadReel } from "@/lib/api";
 import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -111,10 +111,12 @@ export default function JobsPage() {
                     </TableCell>
                     <TableCell className="space-x-2 text-right">
                       {j.status === "DONE" && (
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={`/api/proxy/jobs/${j.id}/download`} download>
-                            Download
-                          </a>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => downloadReel(j.id, `${j.title || "reel"}.mp4`)}
+                        >
+                          Download
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(j.id)}>
