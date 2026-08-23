@@ -11,4 +11,5 @@ async def my_quota(user=Depends(get_current_user)):
     stats = await usage(user.id)
     if user.role == "admin":
         stats["unlimited"] = True
+    stats["plan"] = getattr(user, "plan", "free") or "free"
     return stats

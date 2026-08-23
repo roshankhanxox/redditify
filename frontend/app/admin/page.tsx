@@ -120,13 +120,14 @@ function UsersTab() {
   );
   const [editing, setEditing] = useState<AdminUser | null>(null);
   const [newRole, setNewRole] = useState("free");
+  const [newPlan, setNewPlan] = useState("free");
 
   function saveRole() {
     if (!editing) return;
     api
-      .patch(`/admin/users/${editing.id}`, { role: newRole })
+      .patch(`/admin/users/${editing.id}`, { role: newRole, plan: newPlan })
       .then(() => {
-        toast.success(`Role updated for ${editing.email}`);
+        toast.success(`Updated ${editing.email}`);
         setEditing(null);
         mutate();
       })
@@ -150,7 +151,10 @@ function UsersTab() {
             <TableRow key={u.id}>
               <TableCell className="font-medium">{u.email}</TableCell>
               <TableCell>
-                <Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge>
+                  {u.plan === "premium" && <Badge className="bg-brand/15 text-brand">pro</Badge>}
+                </div>
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {u.quota.daily_used}/{u.quota.daily_limit} · {u.quota.monthly_used}/
@@ -166,6 +170,7 @@ function UsersTab() {
                   onClick={() => {
                     setEditing(u);
                     setNewRole(u.role);
+                    setNewPlan(u.plan ?? "free");
                   }}
                 >
                   Edit
@@ -191,17 +196,28 @@ function UsersTab() {
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit role — {editing?.email}</DialogTitle>
+            <DialogTitle>Edit user — {editing?.email}</DialogTitle>
           </DialogHeader>
-          <Select value={newRole} onValueChange={setNewRole}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="free">Free</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-3">
+            <Select value={newRole} onValueChange={setNewRole}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={newPlan} onValueChange={setNewPlan}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="free">Plan: Free</SelectItem>
+                <SelectItem value="premium">Plan: Premium</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(null)}>
               Cancel

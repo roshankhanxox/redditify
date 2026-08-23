@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { toast } from "sonner";
 import type { JobList } from "@/lib/types";
-import { api } from "@/lib/api";
+import { api, downloadReel } from "@/lib/api";
 import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,26 @@ import {
 } from "@/components/ui/dialog";
 
 const fetcher = (url: string) => api.get(url).then((r) => r.data);
+
+/** Live countdown for an ephemeral reel's remaining lifetime. */
+function ExpiryBadge({ iso }: { iso: string }) {
+  const [label, setLabel] = useState("");
+
+  useEffect(() => {
+    const tick = () => {
+      const ms = new Date(iso).getTime() - Date.now();
+      if (ms <= 0) return setLabel("expired");
+      const m = Math.floor(ms / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      setLabel(`${m}:${String(s).padStart(2, "0")} left`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [iso]);
+
+  return <Badge variant="outline">{label}</Badge>;
+}
 
 const STATUS_VARIANT: Record<string, "secondary" | "default" | "destructive" | "outline"> = {
   DONE: "default",
@@ -96,12 +116,19 @@ export default function JobsPage() {
                   <TableRow key={j.id}>
                     <TableCell className="max-w-xs truncate font-medium">{j.title}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={STATUS_VARIANT[j.status] ?? "secondary"}
-                        title={j.error_message || undefined}
-                      >
-                        {j.status}
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge
+                          variant={STATUS_VARIANT[j.status] ?? "secondary"}
+                          title={j.error_message || undefined}
+                        >
+                          {j.status === "DONE" && !j.result_url && j.retention !== "retain"
+                            ? "Expired"
+                            : j.status}
+                        </Badge>
+                        {j.status === "DONE" && j.result_url && j.retention === "ephemeral" && j.result_expires_at && (
+                          <ExpiryBadge iso={j.result_expires_at} />
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {j.duration_seconds ? `${Math.round(j.duration_seconds)}s` : "—"}
@@ -111,10 +138,12 @@ export default function JobsPage() {
                     </TableCell>
                     <TableCell className="space-x-2 text-right">
                       {j.status === "DONE" && (
-                        <Button size="sm" variant="outline" asChild>
-                          <a href={`/api/proxy/jobs/${j.id}/download`} download>
-                            Download
-                          </a>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => downloadReel(j.id, `${j.title || "reel"}.mp4`)}
+                        >
+                          Download
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(j.id)}>

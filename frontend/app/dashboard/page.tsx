@@ -4,8 +4,9 @@ import { useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, downloadReel } from "@/lib/api";
 import { AppNav } from "@/components/app-nav";
+import { UserBackgroundPanel } from "@/components/background-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -67,22 +68,28 @@ export default function DashboardPage() {
   const [speed, setSpeed] = useState(1.1);
   const [titleStyle, setTitleStyle] = useState("dark");
   const [category, setCategory] = useState("any");
+  const [bgSource, setBgSource] = useState<"library" | "user">("library");
+  const [backgroundId, setBackgroundId] = useState<string>("");
+  const [retention, setRetention] = useState<"ephemeral" | "retain">("ephemeral");
   const [durationIdx, setDurationIdx] = useState(2);
   const [jobId, setJobId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const wordCount = story.trim() ? story.trim().split(/\s+/).length : 0;
 
-  const { data: quota } = useSWR<{ daily_used: number; daily_limit: number; unlimited?: boolean }>(
+  const { data: quota } = useSWR<{ daily_used: number; daily_limit: number; unlimited?: boolean; plan?: string }>(
     session ? "/quota/me" : null,
     fetcher,
     { refreshInterval: 30_000 },
   );
+  const canRetain = session?.user?.role === "admin" || quota?.plan === "premium";
   const { data: assetData } = useSWR<AssetList>(session ? "/assets" : null, fetcher);
 
   function generate() {
     if (!title.trim()) return toast.error("Give your reel a title");
     if (!story.trim()) return toast.error("Paste a story first");
+    if (bgSource === "user" && !backgroundId)
+      return toast.error("Pick or upload your own footage first");
     setCreating(true);
     api
       .post<{ job_id: string; duplicate: boolean }>("/jobs", {
@@ -95,6 +102,9 @@ export default function DashboardPage() {
           speed,
           title_style: titleStyle,
           gameplay_category: category,
+          gameplay_source: bgSource,
+          background_id: bgSource === "user" ? backgroundId : undefined,
+          retention,
           max_words: DURATIONS[durationIdx].words,
         },
       })
@@ -245,20 +255,43 @@ export default function DashboardPage() {
                 </RadioGroup>
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-3">
                 <Label>Gameplay Background</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(assetData?.categories ?? ["any"]).map((c) => (
-                      <SelectItem key={c} value={c} className="capitalize">
-                        {c === "any" ? "Any" : c.replace("_", " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <RadioGroup
+                  value={bgSource}
+                  onValueChange={(v) => setBgSource(v as "library" | "user")}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="library" id="bgsrc-library" />
+                    <Label htmlFor="bgsrc-library" className="font-normal">
+                      Library
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="user" id="bgsrc-user" />
+                    <Label htmlFor="bgsrc-user" className="font-normal">
+                      My footage
+                    </Label>
+                  </div>
+                </RadioGroup>
+
+                {bgSource === "library" ? (
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(assetData?.categories ?? ["any"]).map((c) => (
+                        <SelectItem key={c} value={c} className="capitalize">
+                          {c === "any" ? "Any" : c.replace("_", " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <UserBackgroundPanel value={backgroundId || undefined} onChange={setBackgroundId} />
+                )}
               </div>
 
               <div className="flex flex-col gap-3">
@@ -277,7 +310,36 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {jobId ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <Label>Keep the finished file?</Label>
+                  {!canRetain && (
+                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                      premium
+                    </Badge>
+                  )}
+                </div>
+                <RadioGroup
+                  value={retention}
+                  onValueChange={(v) => setRetention(v as "ephemeral" | "retain")}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="ephemeral" id={`ret-${"ephemeral"}`} />
+                    <Label htmlFor={`ret-${"ephemeral"}`} className="font-normal">
+                      Auto-delete (~15 min)
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="retain" id="ret-retain" disabled={!canRetain} />
+                    <Label htmlFor="ret-retain" className={`font-normal ${canRetain ? "" : "opacity-50"}`}>
+                      Keep until I delete
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {jobId ? (
             <JobStatusTracker jobId={jobId} onReset={reset} />
           ) : (
             <Button size="lg" className="w-full" onClick={generate} disabled={creating}>
@@ -321,10 +383,8 @@ function JobStatusTracker({ jobId, onReset }: { jobId: string; onReset: () => vo
       <Card>
         <CardContent className="flex flex-col gap-3 p-6">
           <p className="font-medium text-center">Your reel is ready!</p>
-          <Button asChild className="w-full">
-            <a href={`/api/proxy/jobs/${jobId}/download`} download>
-              Download MP4
-            </a>
+          <Button className="w-full" onClick={() => downloadReel(jobId, "reel.mp4")}>
+            Download MP4
           </Button>
           <Button variant="outline" className="w-full" onClick={onReset}>
             Generate Another

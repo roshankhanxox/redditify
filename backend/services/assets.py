@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from config import settings
 from db import SessionLocal
-from models import Asset
+from models import Asset, UserBackground
 
 
 def clips_dir() -> str:
@@ -92,6 +92,38 @@ def pick_clip_sync(category: str = "any") -> str:
     if not os.path.exists(path):
         raise RuntimeError(f"Clip file missing on disk: {chosen.filename}")
     return path
+
+
+def pick_clip_for_job_sync(user_id, cfg: dict) -> str:
+    """Resolve the gameplay clip for a job.
+
+    User mode re-verifies ownership inside the worker before touching storage —
+    job.settings is attacker-influenced input. Any inconsistency (missing row,
+    foreign owner, not ready, object gone) falls back to the library picker so
+    a render never hard-fails on footage cleanup races.
+    """
+    from services import storage
+
+    if cfg.get("gameplay_source") == "user":
+        try:
+            bg_id = uuid.UUID(str(cfg.get("background_id")))
+        except (ValueError, TypeError):
+            bg_id = None
+        if bg_id is not None:
+            from sync_db import SyncSessionLocal
+
+            with SyncSessionLocal() as db:
+                bg = db.get(UserBackground, bg_id)
+            if (
+                bg is not None
+                and str(bg.user_id) == str(user_id)
+                and bg.status == "ready"
+                and bg.clip_key
+            ):
+                path = storage.resolve(bg.clip_key)
+                if path is not None:
+                    return path
+    return pick_clip_sync(cfg.get("gameplay_category", "any"))
 
 
 async def pick_clip(category: str = "any") -> str:

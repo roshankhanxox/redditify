@@ -15,12 +15,20 @@ say() { echo -e "${GREEN}[reelbot]${NC} $1"; }
 warn() { echo -e "${YELLOW}[reelbot]${NC} $1"; }
 
 start_docker() {
-  say "Starting Postgres + Redis (docker compose)..."
+  say "Starting Postgres + Redis + MinIO (docker compose)..."
   docker compose up -d
   for i in $(seq 1 30); do
     if docker compose exec -T postgres pg_isready -U reelbot > /dev/null 2>&1; then break; fi
     sleep 1
   done
+  for i in $(seq 1 30); do
+    if docker compose exec -T minio mc ready local > /dev/null 2>&1; then break; fi
+    sleep 1
+  done
+  # S3 lifecycle rules (scratch expiry + stale multipart abort) — no-op in local mode.
+  if [ -f backend/.venv/bin/python ]; then
+    (cd backend && ./.venv/bin/python scripts/apply_lifecycle.py > /dev/null 2>&1 || true)
+  fi
   say "Infra ready."
 }
 
@@ -65,8 +73,8 @@ start_all() {
   say "Launching FastAPI on :8000..."
   (cd backend && nohup ./.venv/bin/python -m uvicorn main:app --port 8000 > ../logs/api.log 2>&1 & echo $! > /tmp/reelbot/api.pid)
 
-  say "Launching Celery worker..."
-  (cd backend && nohup ./.venv/bin/celery -A tasks.render worker -l info --pool=solo --concurrency=1 > ../logs/worker.log 2>&1 & echo $! > /tmp/reelbot/worker.pid)
+  say "Launching Celery worker (with embedded beat)..."
+  (cd backend && nohup ./.venv/bin/celery -A tasks.render worker -l info --pool=solo --concurrency=1 -B > ../logs/worker.log 2>&1 & echo $! > /tmp/reelbot/worker.pid)
 
   say "Launching Next.js on :3000..."
   (cd frontend && nohup npm run dev -- -p 3000 > ../logs/next.log 2>&1 & echo $! > /tmp/reelbot/next.pid)
