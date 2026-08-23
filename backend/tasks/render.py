@@ -91,7 +91,7 @@ def generate_reel(self, job_id: str):
                 provider=cfg.get("tts_provider", "auto"),
                 speed=cfg.get("speed", 1.1),
             )
-            storage.upload(audio_path, _scratch_key(job_id, "voice.mp3"))
+            storage.upload(audio_path, _scratch_key(job_id, "voice.mp3"), keep_local=True)
 
         srt_path = os.path.join(tmp, "subs.ass")
         if storage.download(_scratch_key(job_id, "subs.ass"), srt_path) is None:
@@ -99,7 +99,7 @@ def generate_reel(self, job_id: str):
             words = whisper_service.transcribe(voice_path)
             chunks = whisper_service.words_to_chunks(words)
             whisper_service.chunks_to_ass(chunks, srt_path)
-            storage.upload(srt_path, _scratch_key(job_id, "subs.ass"))
+            storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
 
         card_path = os.path.join(tmp, "title.png")
         if storage.download(_scratch_key(job_id, "title.png"), card_path) is None:
@@ -109,7 +109,7 @@ def generate_reel(self, job_id: str):
                 cfg.get("title_style", "dark"),
                 card_path,
             )
-            storage.upload(card_path, _scratch_key(job_id, "title.png"))
+            storage.upload(card_path, _scratch_key(job_id, "title.png"), keep_local=True)
 
         set_status("PICKING_GAMEPLAY")
         clip_path = assets.pick_clip_for_job_sync(user_id, cfg)

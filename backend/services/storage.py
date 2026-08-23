@@ -56,18 +56,23 @@ def _cache_path(key: str) -> str:
 # --- Core adapter (same signatures as the original local-only module) ---
 
 
-def upload(path: str, key: str) -> str:
-    """Store a local file under key. Returns the logical key stored in jobs.result_url."""
+def upload(path: str, key: str, keep_local: bool = False) -> str:
+    """Store a local file under key. Returns the logical key stored in jobs.result_url.
+
+    keep_local=True keeps the source file on disk (mid-pipeline artifacts like
+    scratch/{job_id}/voice.mp3 are consumed by later stages); the default
+    removes it, matching the historical move-to-storage semantics."""
     if not is_s3():
         dest = os.path.join(_root(), key)
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         shutil.move(path, dest)
         return key
     _s3().upload_file(path, settings.S3_BUCKET, key)
-    try:
-        os.remove(path)
-    except OSError:
-        pass
+    if not keep_local:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
     return key
 
 

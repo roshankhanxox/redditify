@@ -98,6 +98,9 @@ stop_all() {
       rm -f "/tmp/reelbot/$f.pid"
     fi
   done
+  # Stray workers started outside run.sh steal queue messages with stale code
+  # and silently drop jobs — never leave any behind.
+  pkill -f "celery -A tasks.render" 2>/dev/null && say "stopped stray celery workers" || true
   docker compose down 2>/dev/null && say "stopped infra" || true
 }
 
