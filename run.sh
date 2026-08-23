@@ -15,10 +15,14 @@ say() { echo -e "${GREEN}[reelbot]${NC} $1"; }
 warn() { echo -e "${YELLOW}[reelbot]${NC} $1"; }
 
 start_docker() {
-  say "Starting Postgres + Redis (docker compose)..."
+  say "Starting Postgres + Redis + MinIO (docker compose)..."
   docker compose up -d
   for i in $(seq 1 30); do
     if docker compose exec -T postgres pg_isready -U reelbot > /dev/null 2>&1; then break; fi
+    sleep 1
+  done
+  for i in $(seq 1 30); do
+    if docker compose exec -T minio mc ready local > /dev/null 2>&1; then break; fi
     sleep 1
   done
   say "Infra ready."
