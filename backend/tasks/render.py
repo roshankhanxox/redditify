@@ -17,7 +17,7 @@ celery = Celery("reelbot", broker=settings.REDIS_URL, backend=settings.REDIS_URL
 # Beat schedule + worker-side task registration. Tasks live in tasks/maintenance;
 # `include` makes the worker import them at startup so beat messages always
 # find a registered consumer.
-celery.conf.include = ["tasks.maintenance"]
+celery.conf.include = ["tasks.maintenance", "tasks.backgrounds"]
 celery.conf.beat_schedule = {
     "reap-expired-reels": {"task": "tasks.maintenance.reap_expired_reels", "schedule": 60.0},
     "sweep-stale-uploads": {"task": "tasks.maintenance.sweep_stale_uploads", "schedule": 3600.0},

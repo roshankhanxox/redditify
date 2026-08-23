@@ -84,6 +84,11 @@ async def init_background(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if not storage.is_s3():
+        raise HTTPException(
+            503,
+            detail="Background uploads need object storage — set STORAGE_BACKEND=s3",
+        )
     content_type = body.content_type.split(";")[0].strip().lower()
     if content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(422, detail="content_type must be video/mp4, video/quicktime or video/webm")

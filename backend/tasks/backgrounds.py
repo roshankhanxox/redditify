@@ -48,7 +48,9 @@ def process_background(self, background_id: str):
 
         with SyncSessionLocal() as db:
             bg = db.get(UserBackground, uuid.UUID(background_id))
-            if bg is None or bg.status != "pending":
+            # 'pending' = direct drive; 'processing' = normal path (complete
+            # endpoint flips the status just before enqueueing).
+            if bg is None or bg.status not in ("pending", "processing"):
                 return
             source_key = bg.source_key
             base_dir = source_key.rsplit("/", 1)[0]
