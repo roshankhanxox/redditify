@@ -25,6 +25,25 @@ celery.conf.beat_schedule = {
     "sweep-orphan-objects": {"task": "tasks.maintenance.sweep_orphan_objects", "schedule": 7 * 24 * 3600.0},
 }
 
+# Intermediates persisted under scratch/{job_id}/ so a transient failure can
+# resume without re-burning paid TTS. The bucket lifecycle rule (24 h) is the
+# backstop for anything that never reaches a terminal state here.
+STAGE_ARTIFACTS = ("voice.mp3", "subs.ass", "title.png")
+
+
+def _scratch_key(job_id: str, name: str) -> str:
+    return f"scratch/{job_id}/{name}"
+
+
+def _cleanup_scratch(job_id: str):
+    try:
+        from services import storage
+
+        for name in STAGE_ARTIFACTS:
+            storage.delete(_scratch_key(job_id, name))
+    except Exception:
+        pass
+
 
 @celery.task(bind=True, max_retries=2, default_retry_delay=30)
 def generate_reel(self, job_id: str):
@@ -59,33 +78,44 @@ def generate_reel(self, job_id: str):
 
         subreddit_label = cfg.get("subreddit_label") or "reelbot"
 
-        set_status("GENERATING_VOICEOVER")
-        text = preprocess_text(raw_story, subreddit_label, title, max_words=cfg.get("max_words", 1200))
-        audio_path = tts.generate_voiceover(
-            text,
-            cfg.get("voice", "male"),
-            os.path.join(tmp, "voice.mp3"),
-            provider=cfg.get("tts_provider", "auto"),
-            speed=cfg.get("speed", 1.1),
-        )
+        # Resume fast-path: on a retry, restore whatever artifacts survived in
+        # scratch and skip those stages. Anything missing regenerates normally.
+        voice_path = os.path.join(tmp, "voice.mp3")
+        if storage.download(_scratch_key(job_id, "voice.mp3"), voice_path) is None:
+            set_status("GENERATING_VOICEOVER")
+            text = preprocess_text(raw_story, subreddit_label, title, max_words=cfg.get("max_words", 1200))
+            audio_path = tts.generate_voiceover(
+                text,
+                cfg.get("voice", "male"),
+                voice_path,
+                provider=cfg.get("tts_provider", "auto"),
+                speed=cfg.get("speed", 1.1),
+            )
+            storage.upload(audio_path, _scratch_key(job_id, "voice.mp3"))
 
-        set_status("TRANSCRIBING")
-        words = whisper_service.transcribe(audio_path)
-        chunks = whisper_service.words_to_chunks(words)
-        srt_path = whisper_service.chunks_to_ass(chunks, os.path.join(tmp, "subs.ass"))
+        srt_path = os.path.join(tmp, "subs.ass")
+        if storage.download(_scratch_key(job_id, "subs.ass"), srt_path) is None:
+            set_status("TRANSCRIBING")
+            words = whisper_service.transcribe(voice_path)
+            chunks = whisper_service.words_to_chunks(words)
+            whisper_service.chunks_to_ass(chunks, srt_path)
+            storage.upload(srt_path, _scratch_key(job_id, "subs.ass"))
 
-        set_status("RENDERING_TITLE_CARD")
-        card_path = title_card.render(
-            title, subreddit_label,
-            cfg.get("title_style", "dark"),
-            os.path.join(tmp, "title.png"),
-        )
+        card_path = os.path.join(tmp, "title.png")
+        if storage.download(_scratch_key(job_id, "title.png"), card_path) is None:
+            set_status("RENDERING_TITLE_CARD")
+            title_card.render(
+                title, subreddit_label,
+                cfg.get("title_style", "dark"),
+                card_path,
+            )
+            storage.upload(card_path, _scratch_key(job_id, "title.png"))
 
         set_status("PICKING_GAMEPLAY")
         clip_path = assets.pick_clip_for_job_sync(user_id, cfg)
 
         set_status("COMPOSITING_VIDEO")
-        output_path = video.render_video(clip_path, audio_path, card_path, srt_path, os.path.join(tmp, "output.mp4"))
+        output_path = video.render_video(clip_path, voice_path, card_path, srt_path, os.path.join(tmp, "output.mp4"))
         duration = video.get_duration(output_path)
 
         set_status("UPLOADING")
@@ -99,14 +129,19 @@ def generate_reel(self, job_id: str):
 
         set_status("DONE", result_url=result_key, duration_seconds=duration, result_expires_at=expires_at)
 
+        # Terminal success: intermediates served their purpose.
+        _cleanup_scratch(job_id)
+
     except Exception as exc:
         # Auto-retry (max_retries=2, 30s delay) only fires for transient network
         # errors — re-running the whole pipeline after a permanent failure would
-        # burn TTS quota for nothing.
+        # burn TTS quota for nothing. Scratch artifacts are intentionally kept
+        # on the retry path; they are only cleared on terminal success/failure.
         transient = isinstance(exc, (ConnectionError, TimeoutError))
         set_status("FAILED", error_message=str(exc)[:2000])
         if transient and self.request.retries < (self.max_retries or 0):
             raise self.retry(exc=exc)
+        _cleanup_scratch(job_id)
         raise
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

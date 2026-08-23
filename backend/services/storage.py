@@ -89,6 +89,24 @@ def resolve(key: str) -> str | None:
     return path
 
 
+def download(key: str, dest: str) -> str | None:
+    """Fetch key to an exact local destination (pipeline resume paths).
+    Returns dest, or None when the object does not exist."""
+    if not is_s3():
+        src = resolve(key)
+        if src is None:
+            return None
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copyfile(src, dest)
+        return dest
+    try:
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        _s3().download_file(settings.S3_BUCKET, key, dest)
+    except Exception:
+        return None
+    return dest
+
+
 def delete(key: str) -> None:
     """Remove a stored object if it exists. Never raises."""
     try:

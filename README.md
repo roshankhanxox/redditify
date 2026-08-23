@@ -15,6 +15,8 @@ Turn any story into a short-form vertical video (9:16, 1080×1920) ready for You
 - Job queue (Celery + Redis) with live status tracking and exponential-backoff polling
 - Quota system: 3/day, 30/month for free users; admins unlimited
 - Admin panel: stats, user management, clip uploads, all-jobs view
+- S3/MinIO storage backend with presigned downloads, user-uploaded background footage,
+  reel retention (ephemeral auto-delete vs premium keep) and automatic garbage collection
 
 ## Architecture
 
@@ -216,9 +218,22 @@ open /tmp/reelbot/pg.mp4
 | `REDIS_URL` | `redis://localhost:6380/0` | broker + result backend |
 | `SECRET_KEY` | — | HS256 JWT secret; set a real random string in production |
 | `ELEVENLABS_API_KEY` | *(empty)* | optional, `sk_…`, 51 chars |
-| `STORAGE_BACKEND` | `local` | |
-| `LOCAL_STORAGE_PATH` | `./outputs` | finished reels land in `outputs/reels/` |
-| `ASSETS_DIR` | `./assets/gameplay` | gameplay clips |
+| `STORAGE_BACKEND` | `local` | `local` or `s3`; `s3` stores reels, scratch and user footage in S3/MinIO |
+| `LOCAL_STORAGE_PATH` | `./outputs` | local-mode reel storage (`outputs/reels/`) |
+| `S3_ENDPOINT_URL` | *(empty)* | MinIO URL for dev (`http://localhost:9000`); empty = real AWS |
+| `S3_REGION` | `us-east-1` | |
+| `S3_BUCKET` | `reelbot-dev` | private bucket; Block Public Access required |
+| `AWS_ACCESS_KEY_ID` | *(empty)* | dev only against MinIO; prod should use an IAM role instead |
+| `AWS_SECRET_ACCESS_KEY` | *(empty)* | same as above |
+| `RETENTION_TTL_MINUTES` | `15` | lifetime of ephemeral reels after DONE (reaper deletes them) |
+| `SCRATCH_TTL_HOURS` | `24` | intermediate render artifacts lifetime (bucket lifecycle rule) |
+| `MAX_BACKGROUND_UPLOAD_MB` | `500` | per-file cap for user-uploaded footage |
+| `PREVIEW_SIGNED_TTL_SECONDS` | `900` | lifetime of presigned preview links |
+| `DOWNLOAD_SIGNED_TTL_SECONDS` | `600` | lifetime of presigned download links |
+| `UPLOAD_PART_SIGNED_TTL_SECONDS` | `3600` | lifetime of presigned multipart part URLs |
+| `FREE_MAX_BACKGROUNDS` | `3` | ready background clips per free user |
+| `PREMIUM_MAX_BACKGROUNDS` | `25` | ready background clips per premium/admin user |
+| `ASSETS_DIR` | `./assets/gameplay` | gameplay clips (local mode) |
 | `FREE_DAILY_LIMIT` | `3` | free-tier daily quota |
 | `FREE_MONTHLY_LIMIT` | `30` | free-tier monthly quota |
 

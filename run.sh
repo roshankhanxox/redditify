@@ -25,6 +25,10 @@ start_docker() {
     if docker compose exec -T minio mc ready local > /dev/null 2>&1; then break; fi
     sleep 1
   done
+  # S3 lifecycle rules (scratch expiry + stale multipart abort) — no-op in local mode.
+  if [ -f backend/.venv/bin/python ]; then
+    (cd backend && ./.venv/bin/python scripts/apply_lifecycle.py > /dev/null 2>&1 || true)
+  fi
   say "Infra ready."
 }
 
