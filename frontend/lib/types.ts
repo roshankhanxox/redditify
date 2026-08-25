@@ -1,3 +1,36 @@
+export type CaptionPosition = "lower" | "center" | "upper";
+export type CaptionColor = "white" | "yellow" | "brand";
+export type TitlePosition = "top" | "bottom";
+export type TitleCardStyle = "dark" | "light" | "minimal";
+
+export interface RenderSettings {
+  captions_enabled: boolean;
+  caption_font_size: number;
+  caption_position: CaptionPosition;
+  caption_color: CaptionColor;
+  caption_outline: number;
+  caption_words: 1 | 2 | 3;
+  title_enabled: boolean;
+  title_position: TitlePosition;
+  title_scale: number;
+  title_style: TitleCardStyle;
+  title_badge: boolean;
+}
+
+export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
+  captions_enabled: true,
+  caption_font_size: 96,
+  caption_position: "lower",
+  caption_color: "white",
+  caption_outline: 6,
+  caption_words: 2,
+  title_enabled: true,
+  title_position: "top",
+  title_scale: 100,
+  title_style: "dark",
+  title_badge: true,
+};
+
 export interface Job {
   id: string;
   title: string;

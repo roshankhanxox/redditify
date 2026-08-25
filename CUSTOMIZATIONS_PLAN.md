@@ -1,7 +1,7 @@
 # Feature Plan: Render Customizations (Captions, Title Card, Output)
 
-Status: Proposed
-Branch: `feature/render-customizations`
+Status: Implemented on `feature/expressiveness-render-customizations` (combined with the TTS expressiveness knob)
+Branch: `feature/expressiveness-render-customizations`
 Scope: backend (`services/whisper_service.py`, `services/title_card.py`, `tasks/render.py`, `routers/jobs.py`), frontend dashboard
 Depends on: nothing — builds directly on the merged S3/retention work
 

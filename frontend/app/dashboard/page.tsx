@@ -23,8 +23,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AssetList, Job } from "@/lib/types";
+import { DEFAULT_RENDER_SETTINGS, type RenderSettings } from "@/lib/types";
 import { VOICES, TTS_PROVIDERS } from "@/lib/voices";
+import { CustomizePanel, Segmented } from "@/components/customize-panel";
 
 const STATUS_STEPS: Record<string, number> = {
   QUEUED: 5,
@@ -66,7 +69,8 @@ export default function DashboardPage() {
   const [voice, setVoice] = useState("male");
   const [ttsProvider, setTtsProvider] = useState("auto");
   const [speed, setSpeed] = useState(1.1);
-  const [titleStyle, setTitleStyle] = useState("dark");
+  const [expressiveness, setExpressiveness] = useState<"natural" | "expressive" | "dramatic">("expressive");
+  const [render, setRender] = useState<RenderSettings>(DEFAULT_RENDER_SETTINGS);
   const [category, setCategory] = useState("any");
   const [bgSource, setBgSource] = useState<"library" | "user">("library");
   const [backgroundId, setBackgroundId] = useState<string>("");
@@ -100,7 +104,8 @@ export default function DashboardPage() {
           voice,
           tts_provider: ttsProvider,
           speed,
-          title_style: titleStyle,
+          expressiveness,
+          ...render,
           gameplay_category: category,
           gameplay_source: bgSource,
           background_id: bgSource === "user" ? backgroundId : undefined,
@@ -179,81 +184,100 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Right — settings + generation */}
-        <div className="flex flex-col gap-6 lg:col-span-2">
+        {/* Right — settings + generation. Bounded to the viewport; [&>*]:shrink-0
+            is essential: the Cards are flex items with overflow-hidden, so
+            without it they shrink-to-fit instead of overflowing into a
+            scrollbar (content got clipped with nothing to scroll). Scrollbar
+            styling is global (globals.css). */}
+        <div className="flex max-h-[calc(100dvh-6rem)] flex-col gap-6 self-start overflow-y-auto pr-1 [&>*]:shrink-0 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Settings</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-5">
-              <div className="flex flex-col gap-2">
-                <Label>Voice Engine</Label>
-                <RadioGroup
-                  value={ttsProvider}
-                  onValueChange={setTtsProvider}
-                  className="flex flex-col gap-2"
-                >
-                  {TTS_PROVIDERS.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2">
-                      <RadioGroupItem value={p.id} id={`tts-${p.id}`} />
-                      <Label htmlFor={`tts-${p.id}`} className="font-normal">
-                        {p.label}
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
+              <Tabs defaultValue="voice" className="w-full gap-4">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="voice">Voice</TabsTrigger>
+                  <TabsTrigger value="look">Look</TabsTrigger>
+                </TabsList>
 
-              <div className="flex flex-col gap-2">
-                <Label>Voice</Label>
-                <Select value={voice} onValueChange={setVoice}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["Male", "Female"].map((group) => (
-                      <div key={group}>
-                        <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                          {group}
-                        </p>
-                        {VOICES.filter((v) => v.group === group).map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.label}
-                          </SelectItem>
+                <TabsContent value="voice" className="flex flex-col gap-5">
+                  <div className="flex flex-col gap-2">
+                    <Label>Voice Engine</Label>
+                    <RadioGroup
+                      value={ttsProvider}
+                      onValueChange={setTtsProvider}
+                      className="flex flex-col gap-2"
+                    >
+                      {TTS_PROVIDERS.map((p) => (
+                        <div key={p.id} className="flex items-center gap-2">
+                          <RadioGroupItem value={p.id} id={`tts-${p.id}`} />
+                          <Label htmlFor={`tts-${p.id}`} className="font-normal">
+                            {p.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label>Voice</Label>
+                    <Select value={voice} onValueChange={setVoice}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Male", "Female", "Neutral"].map((group) => (
+                          <div key={group}>
+                            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                              {group}
+                            </p>
+                            {VOICES.filter((v) => v.group === group).map((v) => (
+                              <SelectItem key={v.id} value={v.id}>
+                                {v.label}
+                              </SelectItem>
+                            ))}
+                          </div>
                         ))}
-                      </div>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <Label>Speech Speed</Label>
-                  <span className="text-sm text-muted-foreground">{speed.toFixed(2)}×</span>
-                </div>
-                <Slider
-                  min={0.8}
-                  max={1.5}
-                  step={0.05}
-                  value={[speed]}
-                  onValueChange={([v]) => setSpeed(v)}
-                />
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <Label>Title Card Style</Label>
-                <RadioGroup value={titleStyle} onValueChange={setTitleStyle} className="flex gap-4">
-                  {["dark", "light", "minimal"].map((s) => (
-                    <div key={s} className="flex items-center gap-2">
-                      <RadioGroupItem value={s} id={`style-${s}`} />
-                      <Label htmlFor={`style-${s}`} className="capitalize font-normal">
-                        {s}
-                      </Label>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Speech Speed</Label>
+                      <span className="text-sm text-muted-foreground">{speed.toFixed(2)}×</span>
                     </div>
-                  ))}
-                </RadioGroup>
-              </div>
+                    <Slider
+                      min={0.8}
+                      max={1.5}
+                      step={0.05}
+                      value={[speed]}
+                      onValueChange={([v]) => setSpeed(v)}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label>Expressiveness</Label>
+                    <Segmented
+                      value={expressiveness}
+                      onChange={(v) => setExpressiveness(v)}
+                      options={[
+                        { value: "natural", label: "Natural" },
+                        { value: "expressive", label: "Expressive" },
+                        { value: "dramatic", label: "Dramatic" },
+                      ]}
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="look" className="pt-1">
+                  <CustomizePanel
+                    value={render}
+                    onChange={(patch) => setRender((r) => ({ ...r, ...patch }))}
+                  />
+                </TabsContent>
+              </Tabs>
 
               <div className="flex flex-col gap-3">
                 <Label>Gameplay Background</Label>

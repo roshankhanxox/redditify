@@ -57,29 +57,46 @@ def render_preview(src: str, dst: str) -> str:
 def render_video(
     gameplay_clip: str,
     audio_path: str,
-    title_card: str,
-    subtitle_file: str,
     output_path: str,
+    card: str | None = None,
+    subs: str | None = None,
+    card_pos: str = "top",
 ) -> str:
+    """Composite the vertical reel: gameplay + voiceover, with an optional
+    title-card overlay and/or burned-in ASS captions.
+
+    card=None skips the overlay entirely; subs=None skips the subtitle burn.
+    card_pos places the card 'top' (y=80) or 'bottom' (y=H-h-120).
+    """
     duration = get_duration(audio_path)
 
-    # Subtitle file path must use forward slashes and be escaped for FFmpeg filter
-    sub_path = subtitle_file.replace("\\", "/").replace(":", "\\:")
-
-    # Styling lives entirely inside the .ass subtitle file (PlayRes 1080x1920).
-    # No force_style here — it would override the ASS styles.
-    filter_complex = (
-        f"[0:v]scale=1080:1920,setsar=1[bg];"
-        f"[bg][2:v]overlay=(W-w)/2:80:enable='between(t,0,{duration:.3f})'[titled];"
-        f"[titled]subtitles='{sub_path}'[final]"
-    )
-
-    run_ffmpeg([
+    inputs = [
         "-stream_loop", "-1", "-t", str(duration + 0.5), "-i", gameplay_clip,
         "-i", audio_path,
-        "-i", title_card,
-        "-filter_complex", filter_complex,
-        "-map", "[final]",
+    ]
+    if card:
+        inputs += ["-i", card]
+
+    # Styling lives entirely inside the .ass subtitle file (PlayRes 1080x1920).
+    # No force_style here — it would override the ASS styles. With no layers at
+    # all the scaled stream is mapped directly as [vout].
+    filters = [f"[0:v]scale=1080:1920,setsar=1{'[bg]' if (card or subs) else '[vout]'}"]
+
+    current = "[bg]"
+    if card:
+        y = "H-h-120" if card_pos == "bottom" else "80"
+        enable = f":enable='between(t,0,{duration:.3f})'"
+        label = "[layered]" if subs else "[vout]"
+        filters.append(f"[bg][2:v]overlay=(W-w)/2:{y}{enable}{label}")
+        current = "[layered]"
+    if subs:
+        sub_path = subs.replace("\\", "/").replace(":", "\\:")
+        filters.append(f"{current}subtitles='{sub_path}'[vout]")
+
+    run_ffmpeg([
+        *inputs,
+        "-filter_complex", ";".join(filters),
+        "-map", "[vout]",
         "-map", "1:a",
         "-t", str(duration + 0.5),
         "-c:v", "libx264", "-crf", "18", "-preset", "fast",

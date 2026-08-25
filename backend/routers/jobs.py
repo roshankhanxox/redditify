@@ -13,16 +13,50 @@ from security import get_current_user
 from services.jobs import find_active_job
 from services.quota import check_quota, increment_quota
 from services.storage import presign_get, resolve
-from services.tts import VOICE_CATALOG, VALID_TTS_PROVIDERS
+from services.tts import VOICE_CATALOG, VALID_EXPRESSIVENESS, VALID_TTS_PROVIDERS
 from tasks.render import generate_reel
 
 router = APIRouter(tags=["jobs"])
 
 VALID_TITLE_STYLES = ("dark", "light", "minimal")
 VALID_CATEGORIES = ("any", "minecraft", "subway_surfers", "satisfying", "other")
+VALID_CAPTION_POSITIONS = ("lower", "center", "upper")
+VALID_CAPTION_COLORS = ("white", "yellow", "brand")
+VALID_TITLE_POSITIONS = ("top", "bottom")
 
-# legacy ids from the original two-voice spec still resolve
-_LEGACY_VOICES = {"male": "male", "female": "female", "neutral": "rachel"}
+# legacy ids still resolve: original two-voice spec ("male"/"female") plus
+# every key retired across catalog rebuilds. Targets are always current keys.
+_LEGACY_VOICES = {
+    "male": "daniel",
+    "female": "sarah",
+    "neutral": "river",
+    "anton": "antoni",
+    "arnold": "eric",
+    "chris": "roger",
+    "josh": "adam",
+    "emily": "lily",
+    "rachel": "lily",
+    "charlotte": "alice",
+    "gigi": "jessica",
+    "jessie": "jessica",
+}
+
+
+def _clamp_int(s: dict, key: str, default: int, lo: int, hi: int) -> int:
+    try:
+        return max(lo, min(hi, int(s.get(key, default))))
+    except (TypeError, ValueError):
+        return default
+
+
+def _to_bool(value, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return default
 
 
 class JobCreate(BaseModel):
@@ -36,7 +70,7 @@ def _sanitize_settings(s: dict) -> dict:
     out = {}
     voice = s.get("voice")
     voice = _LEGACY_VOICES.get(voice, voice)
-    out["voice"] = voice if voice in VOICE_CATALOG else "male"
+    out["voice"] = voice if voice in VOICE_CATALOG else "daniel"
     provider = s.get("tts_provider")
     out["tts_provider"] = provider if provider in VALID_TTS_PROVIDERS else "auto"
     try:
@@ -51,6 +85,26 @@ def _sanitize_settings(s: dict) -> dict:
         out["background_id"] = str(s.get("background_id") or "")
     retention = s.get("retention")
     out["retention"] = retention if retention in ("ephemeral", "retain") else "ephemeral"
+    expressiveness = s.get("expressiveness")
+    out["expressiveness"] = expressiveness if expressiveness in VALID_EXPRESSIVENESS else "expressive"
+
+    # Render customizations — enums are whitelisted and ints clamped here so
+    # nothing but known-safe values can ever reach libass/PIL/ffmpeg.
+    out["captions_enabled"] = _to_bool(s.get("captions_enabled"), True)
+    out["caption_font_size"] = _clamp_int(s, "caption_font_size", 96, 48, 140)
+    position = s.get("caption_position")
+    out["caption_position"] = position if position in VALID_CAPTION_POSITIONS else "lower"
+    color = s.get("caption_color")
+    out["caption_color"] = color if color in VALID_CAPTION_COLORS else "white"
+    out["caption_outline"] = _clamp_int(s, "caption_outline", 6, 0, 12)
+    out["caption_words"] = _clamp_int(s, "caption_words", 2, 1, 3)
+
+    out["title_enabled"] = _to_bool(s.get("title_enabled"), True)
+    title_pos = s.get("title_position")
+    out["title_position"] = title_pos if title_pos in VALID_TITLE_POSITIONS else "top"
+    out["title_scale"] = _clamp_int(s, "title_scale", 100, 60, 130)
+    out["title_badge"] = _to_bool(s.get("title_badge"), True)
+
     try:
         out["max_words"] = max(50, min(2000, int(s.get("max_words", 1200))))
     except (TypeError, ValueError):
