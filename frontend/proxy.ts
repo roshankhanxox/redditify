@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { auth } from "@/auth"
 
-const PROTECTED = ["/dashboard", "/jobs", "/admin"]
+const PROTECTED = ["/dashboard", "/admin"]
 
 export default async function proxy(req: NextRequest) {
   const session = await auth().catch(() => null)
@@ -29,5 +29,5 @@ export default async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/jobs/:path*", "/admin/:path*"],
+  matcher: ["/dashboard/:path*", "/admin/:path*"],
 }

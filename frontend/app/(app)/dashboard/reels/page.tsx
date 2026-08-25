@@ -6,7 +6,6 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import type { JobList } from "@/lib/types";
 import { api, downloadReel } from "@/lib/api";
-import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,7 +84,6 @@ export default function JobsPage() {
 
   return (
     <>
-      <AppNav />
       <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="font-heading text-3xl font-semibold tracking-tight">My Jobs</h1>
@@ -95,7 +93,7 @@ export default function JobsPage() {
         <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border py-24 text-center">
           <p className="text-base text-muted-foreground">You haven&rsquo;t generated any reels yet.</p>
           <Button asChild>
-            <Link href="/dashboard">Create your first reel</Link>
+            <Link href="/dashboard/create">Create your first reel</Link>
           </Button>
         </div>
       ) : (

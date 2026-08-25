@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { toast } from "sonner";
 import { api, downloadReel } from "@/lib/api";
-import { AppNav } from "@/components/app-nav";
 import { UserBackgroundPanel } from "@/components/background-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,7 +127,6 @@ export default function DashboardPage() {
 
   return (
     <>
-      <AppNav />
       <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         <header className="mb-6 flex items-center justify-between">
           <h1 className="font-heading text-3xl font-semibold tracking-tight">Create a Reel</h1>
