@@ -23,7 +23,7 @@ export default async function CreateTemplatePage({
   const { template } = await params;
   if (!TEMPLATE_IDS.includes(template as TemplateId)) notFound();
 
-  if (template !== "story") {
+  if (template !== "story" && template !== "meme") {
     return (
       <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         <Empty className="border border-dashed">
@@ -33,8 +33,8 @@ export default async function CreateTemplatePage({
             </EmptyMedia>
             <EmptyTitle>Coming soon</EmptyTitle>
             <EmptyDescription>
-              This format is part of the next Dashboard V2 phases. Story Reel is
-              available today.
+              This format is part of the next Dashboard V2 phases. Story Reel and
+              Meme Studio are available today.
             </EmptyDescription>
           </EmptyHeader>
           <Button asChild variant="outline">
@@ -48,7 +48,7 @@ export default async function CreateTemplatePage({
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
       <Suspense fallback={null}>
-        <StoryWizard />
+        <StoryWizard template={template} />
       </Suspense>
     </div>
   );

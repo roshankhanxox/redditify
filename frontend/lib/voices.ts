@@ -21,6 +21,7 @@ export const VOICES: { id: string; label: string; group: string }[] = [
   { id: "matilda", label: "Matilda · Professional Alto", group: "Female" },
   { id: "sarah", label: "Sarah · Confident & Warm", group: "Female" },
   { id: "river", label: "River · Relaxed Androgynous", group: "Neutral" },
+  { id: "ana", label: "Ana · Kid Voice", group: "Kid" },
 ];
 
 export const TTS_PROVIDERS = [

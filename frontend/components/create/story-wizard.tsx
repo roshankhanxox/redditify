@@ -12,7 +12,7 @@ import {
   RotateCcw,
   Sparkles,
 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, type UseFormSetValue, type UseFormWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
@@ -20,6 +20,7 @@ import { UserBackgroundPanel } from "@/components/background-picker";
 import type { AssetList } from "@/lib/types";
 import { VOICES, TTS_PROVIDERS } from "@/lib/voices";
 import {
+  DEFAULT_MEME_STATE,
   DEFAULT_WIZARD_STATE,
   DURATIONS,
   STEPS,
@@ -44,6 +45,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CustomizePanel, Segmented } from "@/components/customize-panel";
+import { cn } from "@/lib/utils";
 import { PhoneFramePreview } from "@/components/create/phone-preview";
 import { Stepper } from "@/components/create/stepper";
 
@@ -78,8 +80,9 @@ function Row({
   );
 }
 
-export function StoryWizard() {
+export function StoryWizard({ template = "story" }: { template?: "story" | "meme" }) {
   const router = useRouter();
+  const isMeme = template === "meme";
   const [step, setStep] = useState(0);
   const [maxVisited, setMaxVisited] = useState(0);
   const [creating, setCreating] = useState(false);
@@ -95,7 +98,7 @@ export function StoryWizard() {
     formState: { errors },
   } = useForm<WizardInput, unknown, WizardState>({
     resolver: zodResolver(wizardSchema),
-    defaultValues: DEFAULT_WIZARD_STATE,
+    defaultValues: isMeme ? DEFAULT_MEME_STATE : DEFAULT_WIZARD_STATE,
     mode: "onTouched",
   });
 
@@ -113,11 +116,11 @@ export function StoryWizard() {
       .get(`/jobs/${from}`)
       .then(({ data }) => {
         reset(stateFromJob(data));
-        clearDraft("story");
+        clearDraft(template);
         toast.info(
           `Settings loaded from "${(data.title || "untitled reel").slice(0, 60)}"`,
         );
-        router.replace("/dashboard/create/story");
+        router.replace(`/dashboard/create/${template}`);
       })
       .catch(() => toast.error("Couldn't load that reel's settings"));
   }, [searchParams, reset, router]);
@@ -131,13 +134,13 @@ export function StoryWizard() {
     setValue("gameplay_source", "user", { shouldDirty: true });
     setValue("background_id", bgParam, { shouldDirty: true });
     toast.info("Footage selected for your reel");
-    router.replace("/dashboard/create/story");
+    router.replace(`/dashboard/create/${template}`);
   }, [bgParam, setValue, router]);
 
   useEffect(() => {
     if (restoredOnce.current) return;
     restoredOnce.current = true;
-    const draft = loadDraft("story");
+    const draft = loadDraft(template);
     if (draft && (draft.title || draft.story)) {
       reset(draft);
       toast.info("Draft restored", {
@@ -152,7 +155,7 @@ export function StoryWizard() {
     const sub = watch((values) => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(
-        () => saveDraft("story", values as WizardState),
+        () => saveDraft(template, values as WizardState),
         500,
       );
     });
@@ -198,7 +201,7 @@ export function StoryWizard() {
         "/jobs",
         buildPayload(state),
       );
-      clearDraft("story");
+      clearDraft(template);
       toast.success(r.data.duplicate ? "Already rendering this story" : "Reel queued");
       router.push(`/dashboard/reels?highlight=${r.data.job_id}`);
     } catch (err: unknown) {
@@ -299,7 +302,7 @@ export function StoryWizard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {["Male", "Female", "Neutral"].map((group) => (
+                        {["Male", "Female", "Neutral", "Kid"].map((group) => (
                           <div key={group}>
                             <p className="px-2 py-1 text-[13px] font-medium text-muted-foreground">
                               {group}
@@ -339,7 +342,9 @@ export function StoryWizard() {
                 </>
               )}
 
-              {step === 2 && (
+              {step === 2 && isMeme && <MemeLookStep watch={watch} setValue={setValue} />}
+
+              {step === 2 && !isMeme && (
                 <>
                   <CustomizePanel
                     preview={false}
@@ -542,12 +547,43 @@ function ReviewSummary({
     {
       title: "Look & background",
       step: 2,
-      rows: [
-        ["Captions", values.captions_enabled ? `On · ${values.caption_font_size}px · ${values.caption_color} · ${values.caption_position}` : "Off"],
-        ["Title card", values.title_enabled ? `On · ${values.title_position} · ${values.title_scale}%` : "Off"],
-        ["Background", values.gameplay_source === "user" ? "My footage" : `Library · ${values.gameplay_category}`],
-        ["File retention", values.retention === "retain" ? "Keep until deleted" : "Auto-delete ~15 min"],
-      ],
+      rows: ((values.template === "meme"
+        ? [
+            ["Scene", SCENE_LABELS[values.scene_id] ?? values.scene_id],
+            [
+              "Voice pitch",
+              values.tts_pitch
+                ? `${values.tts_pitch > 0 ? "+" : ""}${values.tts_pitch} st`
+                : "natural",
+            ],
+          ]
+        : [
+            [
+              "Background",
+              values.gameplay_source === "user"
+                ? "My footage"
+                : `Library · ${values.gameplay_category}`,
+            ],
+          ]) as [string, React.ReactNode][]).concat([
+        [
+          "Captions",
+          values.captions_enabled
+            ? `On · ${values.caption_font_size}px · ${values.caption_color} · ${values.caption_position}`
+            : "Off",
+        ],
+        [
+          "Title card",
+          values.title_enabled
+            ? `On · ${values.title_position} · ${values.title_scale}%`
+            : "Off",
+        ],
+        [
+          "File retention",
+          values.retention === "retain"
+            ? "Keep until deleted"
+            : "Auto-delete ~15 min",
+        ],
+      ]),
     },
   ];
 
@@ -599,3 +635,81 @@ const truncate = (t: string, n: number) =>
   t.length > n ? `${t.slice(0, n)}…` : t || "";
 const wordCountOf = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0);
 const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+
+// ------------------------------------------------------------------ meme look
+
+const SCENE_LABELS: Record<string, string> = {
+  rainbow: "Rainbow Drift",
+  sunset: "Sunset",
+  ocean: "Ocean",
+  candy: "Candy Pastel",
+  midnight: "Starry Night",
+  forest: "Mint Forest",
+};
+
+function MemeLookStep({
+  watch,
+  setValue,
+  error,
+}: {
+  watch: UseFormWatch<WizardInput>;
+  setValue: UseFormSetValue<WizardInput>;
+  error?: string;
+}) {
+  const { data: scenes } = useSWR<{ id: string; label: string; kind: string }[]>(
+    "/scenes",
+    fetcher,
+  );
+  const selected = watch("scene_id");
+  const pitch = watch("tts_pitch");
+
+  return (
+    <>
+      <Row label="Scene">
+        <div className="grid grid-cols-3 gap-3">
+          {(scenes ?? []).map((sc) => (
+            <button
+              key={sc.id}
+              type="button"
+              onClick={() => setValue("scene_id", sc.id, { shouldDirty: true })}
+              aria-pressed={selected === sc.id}
+              className={cn(
+                "flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border p-1.5 transition-colors",
+                selected === sc.id
+                  ? "border-brand ring-1 ring-brand"
+                  : "hover:border-ring",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/proxy/scenes/${sc.id}/preview`}
+                alt=""
+                loading="lazy"
+                className="aspect-[9/16] w-full rounded-md object-cover"
+              />
+              <span className="pb-0.5 text-[13px] font-medium">{sc.label}</span>
+            </button>
+          ))}
+        </div>
+        <FieldError msg={error} />
+      </Row>
+
+      <Row
+        label="Voice pitch"
+        hint={pitch ? `${pitch > 0 ? "+" : ""}${pitch} st` : "natural"}
+      >
+        <Slider
+          min={-12}
+          max={12}
+          step={1}
+          value={[pitch]}
+          onValueChange={([v]) => setValue("tts_pitch", v, { shouldDirty: true })}
+        />
+        <p className="text-[13px] text-muted-foreground">
+          Pitch up for the classic meme sound. Applied after transcription, so
+          captions stay word-synced.
+        </p>
+      </Row>
+    </>
+  );
+}
