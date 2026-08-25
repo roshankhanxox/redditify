@@ -39,11 +39,23 @@ export interface Job {
   settings: Record<string, unknown>;
   retention: string;
   result_url: string | null;
+  thumbnail_url: string | null;
   result_expires_at: string | null;
   error_message: string | null;
   duration_seconds: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface StatsMe {
+  total_reels: number;
+  total_seconds: number;
+  daily_used: number;
+  daily_limit: number;
+  monthly_used: number;
+  monthly_limit: number;
+  unlimited: boolean;
+  plan: string;
 }
 
 export interface JobList {
