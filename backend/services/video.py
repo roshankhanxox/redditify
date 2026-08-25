@@ -54,6 +54,18 @@ def render_preview(src: str, dst: str) -> str:
     return dst
 
 
+def extract_thumbnail(src: str, dst: str, at_seconds: float = 1.0) -> str:
+    """Poster frame for dashboard cards: 270x480 JPG grabbed near at_seconds."""
+    run_ffmpeg([
+        "-ss", f"{max(0.0, at_seconds):.3f}", "-i", src,
+        "-frames:v", "1",
+        "-vf", "scale=270:480",
+        "-q:v", "5",
+        dst,
+    ])
+    return dst
+
+
 def render_video(
     gameplay_clip: str,
     audio_path: str,

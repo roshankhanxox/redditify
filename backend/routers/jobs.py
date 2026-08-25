@@ -112,7 +112,19 @@ def _sanitize_settings(s: dict) -> dict:
     return out
 
 
+def thumbnail_key_for(job: Job) -> str:
+    return f"users/{job.user_id}/thumbs/{job.id}.jpg"
+
+
 def job_to_dict(j: Job) -> dict:
+    # Thumbnails exist only for reels rendered after V2 Phase 2; clients fall
+    # back to a skeleton when the URL 404s, so no existence check here.
+    thumb_url = None
+    if j.status == "DONE" and j.result_url:
+        if settings.STORAGE_BACKEND == "s3":
+            thumb_url = presign_get(thumbnail_key_for(j), 300)
+        else:
+            thumb_url = f"/jobs/{j.id}/thumbnail"
     return {
         "id": str(j.id),
         "title": j.post_title,
@@ -121,6 +133,7 @@ def job_to_dict(j: Job) -> dict:
         "settings": j.settings,
         "retention": getattr(j, "retention", None) or "ephemeral",
         "result_url": j.result_url,
+        "thumbnail_url": thumb_url,
         "result_expires_at": j.result_expires_at.isoformat() if j.result_expires_at else None,
         "error_message": j.error_message,
         "duration_seconds": j.duration_seconds,
@@ -228,9 +241,34 @@ async def delete_job(
     if job.result_url:
         from services.storage import delete as storage_delete
         storage_delete(job.result_url)
+        storage_delete(thumbnail_key_for(job))
     await db.delete(job)
     await db.commit()
     return {"deleted": True}
+
+
+@router.get("/jobs/{job_id}/thumbnail")
+async def job_thumbnail(
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Poster frame (local mode). Ownership-checked; S3 mode 302s to a
+    short-lived presigned GET instead of proxying bytes through the API."""
+    job = await _get_job_checked(job_id, user, db)
+    if job.status != "DONE" or not job.result_url:
+        raise HTTPException(409, detail="Job has no thumbnail")
+    key = thumbnail_key_for(job)
+    if settings.STORAGE_BACKEND == "s3":
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse(presign_get(key, 300))
+    from services.storage import resolve
+
+    path = resolve(key)
+    if path is None:
+        raise HTTPException(404, detail="Thumbnail not found")
+    return FileResponse(path, media_type="image/jpeg")
 
 
 @router.get("/jobs/{job_id}/download")
