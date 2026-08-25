@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Type } from "lucide-react";
+import { Pencil, Plus, Trash2, Type } from "lucide-react";
 import useSWR from "swr";
 import { api } from "@/lib/api";
 import {
   clamp01,
   clampScale,
-  pointerToNormalized,
   type CharacterPlacement,
   type TextPlacement,
 } from "@/lib/placement";
@@ -31,6 +30,14 @@ export interface FontOption {
 }
 
 const TEXT_COLORS = ["#ffffff", "#000000", "#ff4500", "#ffe500", "#00e5ff"];
+const MAX_LAYERS = 3;
+
+const TEXT_PRESETS: { label: string; patch: Partial<TextPlacement> }[] = [
+  { label: "NOBODY:", patch: { text: "NOBODY:", font_id: "anton", scale: 0.55 } },
+  { label: "POV:", patch: { text: "POV:", font_id: "bebasneue", scale: 0.7 } },
+  { label: "WAIT FOR IT", patch: { text: "WAIT FOR IT", font_id: "patrickhand", scale: 0.5, color: "#ffe500" } },
+  { label: "NOT ME…", patch: { text: "NOT ME…", font_id: "caveat", scale: 0.45 } },
+];
 
 const fetcher = (url: string) => api.get(url).then((r) => r.data);
 
@@ -60,6 +67,11 @@ interface Selection {
   index: number;
 }
 
+type DragState =
+  | { mode: "drag"; kind: "char" | "text"; index: number; startX: number; startY: number; origX: number; origY: number }
+  | { mode: "resize"; kind: "char" | "text"; index: number; startX: number; origScale: number }
+  | null;
+
 export function LayerEditor({
   sceneId,
   characters,
@@ -78,129 +90,142 @@ export function LayerEditor({
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<Selection | null>(null);
-  const dragRef = useRef<{ kind: "char" | "text"; index: number; dx: number; dy: number } | null>(null);
-  const resizeRef = useRef<{ kind: "char" | "text"; index: number; startX: number; startScale: number; centerX: number } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const dragRef = useRef<DragState>(null);
 
-  const charFiles = useMemo(() => {
-    // asset display urls are stable per id — proxied through auth
-    return new Map(characters.map((c) => [c.asset_id, `/api/proxy/characters/${c.asset_id}/file`]));
-  }, [characters]);
+  const charFiles = useMemo(
+    () => new Map(characters.map((c) => [c.asset_id, `/api/proxy/characters/${c.asset_id}/file`])),
+    [characters],
+  );
 
   function setChar(i: number, patch: Partial<CharacterPlacement>) {
-    const next = characters.map((c, k) => (k === i ? { ...c, ...patch } : c));
-    onCharactersChange(next);
+    onCharactersChange(characters.map((c, k) => (k === i ? { ...c, ...patch } : c)));
   }
   function setText(i: number, patch: Partial<TextPlacement>) {
-    const next = texts.map((t, k) => (k === i ? { ...t, ...patch } : t));
-    onTextsChange(next);
+    onTextsChange(texts.map((t, k) => (k === i ? { ...t, ...patch } : t)));
   }
 
-  function onLayerPointerDown(
-    e: React.PointerEvent,
-    kind: "char" | "text",
-    index: number,
-  ) {
+  // ------------------------------------------------------------- interactions
+
+  function startDrag(e: React.PointerEvent, kind: "char" | "text", index: number) {
+    if (editing && kind === "text" && selected?.kind === "text" && selected.index === index) {
+      return; // typing inside the layer — don't hijack
+    }
     e.stopPropagation();
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
     setSelected({ kind, index });
-    const pos = pointerToNormalized(e, rect);
-    const cur =
-      kind === "char"
-        ? characters[index]
-        : texts[index];
-    if (!cur) return;
+    setEditing(false);
+    const cur = kind === "char" ? characters[index] : texts[index];
+    if (!cur || !canvasRef.current) return;
     dragRef.current = {
+      mode: "drag",
       kind,
       index,
-      dx: pos.x - cur.x,
-      dy: pos.y - cur.y,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: cur.x,
+      origY: cur.y,
     };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
 
-  function onCanvasPointerMove(e: React.PointerEvent) {
+  function startResize(e: React.PointerEvent, kind: "char" | "text", index: number) {
+    e.stopPropagation();
+    setSelected({ kind, index });
+    const cur = kind === "char" ? characters[index] : texts[index];
+    if (!cur) return;
+    dragRef.current = {
+      mode: "resize",
+      kind,
+      index,
+      startX: e.clientX,
+      origScale: cur.scale,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onLayerPointerMove(e: React.PointerEvent) {
+    const d = dragRef.current;
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    if (dragRef.current) {
-      const { kind, index, dx, dy } = dragRef.current;
-      const pos = pointerToNormalized(e, rect);
-      if (kind === "char") setChar(index, { x: clamp01(pos.x - dx), y: clamp01(pos.y - dy) });
-      else setText(index, { x: clamp01(pos.x - dx), y: clamp01(pos.y - dy) });
-      return;
-    }
-
-    if (resizeRef.current) {
-      const r = resizeRef.current;
-      const delta = (r.startX - e.clientX) / rect.width;
-      const scale = clampScale(r.startScale + delta * 2, r.kind);
-      if (r.kind === "char") setChar(r.index, { scale });
-      else setText(r.index, { scale });
+    if (!d || !rect) return;
+    if (d.mode === "drag") {
+      const dx = (e.clientX - d.startX) / rect.width;
+      const dy = (e.clientY - d.startY) / rect.height;
+      const x = clamp01(d.origX + dx);
+      const y = clamp01(d.origY + dy);
+      if (d.kind === "char") setChar(d.index, { x, y });
+      else setText(d.index, { x, y });
+    } else {
+      // Right edge of the box is the grip: drag outward to grow.
+      const delta = ((e.clientX - d.startX) / rect.width) * 2;
+      const scale = clampScale(d.origScale + delta, d.kind);
+      if (d.kind === "char") setChar(d.index, { scale });
+      else setText(d.index, { scale });
     }
   }
 
-  function endPointer() {
+  function endDrag() {
     dragRef.current = null;
-    resizeRef.current = null;
+  }
+
+  function removeAt(kind: "char" | "text", index: number) {
+    if (kind === "char") onCharactersChange(characters.filter((_, k) => k !== index));
+    else onTextsChange(texts.filter((_, k) => k !== index));
+    setSelected(null);
+    setEditing(false);
   }
 
   // Keyboard nudge / delete for the selected layer.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      const el = e.target as HTMLElement;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) return;
       if (!selected) return;
       const step = e.shiftKey ? 0.05 : 0.01;
+      const cur = selected.kind === "char" ? characters[selected.index] : texts[selected.index];
+      if (!cur) return;
       const bump = (dx: number, dy: number) => {
         e.preventDefault();
-        if (selected.kind === "char") {
-          const c = characters[selected.index];
-          if (c) setChar(selected.index, { x: clamp01(c.x + dx), y: clamp01(c.y + dy) });
-        } else {
-          const t = texts[selected.index];
-          if (t) setText(selected.index, { x: clamp01(t.x + dx), y: clamp01(t.y + dy) });
-        }
+        if (selected.kind === "char") setChar(selected.index, { x: clamp01(cur.x + dx), y: clamp01(cur.y + dy) });
+        else setText(selected.index, { x: clamp01(cur.x + dx), y: clamp01(cur.y + dy) });
       };
       switch (e.key) {
         case "ArrowLeft": bump(-step, 0); break;
         case "ArrowRight": bump(step, 0); break;
         case "ArrowUp": bump(0, -step); break;
         case "ArrowDown": bump(0, step); break;
+        case "Enter":
+          if (selected.kind === "text") {
+            e.preventDefault();
+            setEditing(true);
+          }
+          break;
         case "Delete":
         case "Backspace":
           e.preventDefault();
-          removeSelected();
+          removeAt(selected.kind, selected.index);
           break;
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, characters, texts]);
+  }, [selected, characters, texts, editing]);
 
-  function removeSelected() {
-    if (!selected) return;
-    if (selected.kind === "char") {
-      onCharactersChange(characters.filter((_, k) => k !== selected.index));
-    } else {
-      onTextsChange(texts.filter((_, k) => k !== selected.index));
-    }
-    setSelected(null);
-  }
-
-  function addText() {
+  function addText(patch: Partial<TextPlacement> = {}) {
+    if (texts.length >= MAX_LAYERS) return;
     const next: TextPlacement = {
       text: "YOUR TEXT",
       font_id: fonts?.[0]?.id ?? "anton",
       x: 0.5,
       y: Math.max(0.12, 0.15 + texts.length * 0.1),
-      scale: 0.7,
+      scale: 0.5,
       color: "#ffffff",
       align: "center",
+      ...patch,
     };
-    onTextsChange([...texts, next].slice(0, 3));
+    onTextsChange([...texts, next]);
     setSelected({ kind: "text", index: texts.length });
+    setEditing(true); // straight into typing
   }
 
   const sel =
@@ -209,6 +234,57 @@ export function LayerEditor({
       : selected?.kind === "text"
         ? texts[selected.index]
         : null;
+
+  // Selection toolbar flips below the layer when it hugs the top edge.
+  const toolbarBelow = sel ? sel.y < 0.14 : false;
+
+  function SelectionChrome({ kind, index }: { kind: "char" | "text"; index: number }) {
+    const isSel = selected?.kind === kind && selected.index === index;
+    if (!isSel) return null;
+    return (
+      <>
+        {/* floating toolbar */}
+        <div
+          className="absolute -top-9 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-md border bg-background/95 p-1 shadow-sm"
+          style={{ top: toolbarBelow ? undefined : "-2.25rem", bottom: toolbarBelow ? "-2.25rem" : undefined }}
+        >
+          {kind === "text" && (
+            <button
+              type="button"
+              aria-label="Edit text"
+              className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditing(true);
+              }}
+            >
+              <Pencil className="size-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Delete layer"
+            className="cursor-pointer rounded p-1 text-destructive hover:bg-destructive/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              removeAt(kind, index);
+            }}
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </div>
+        {/* resize grip */}
+        <span
+          role="button"
+          aria-label="Resize layer"
+          onPointerDown={(e) => startResize(e, kind, index)}
+          onPointerMove={onLayerPointerMove}
+          onPointerUp={endDrag}
+          className="absolute -bottom-1.5 -right-1.5 block size-4 cursor-nwse-resize rounded-full border-2 border-background bg-brand shadow-sm"
+        />
+      </>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -219,10 +295,10 @@ export function LayerEditor({
           role="application"
           aria-label="Reel layer canvas"
           tabIndex={0}
-          onPointerMove={onCanvasPointerMove}
-          onPointerUp={endPointer}
-          onPointerLeave={endPointer}
-          onClick={() => setSelected(null)}
+          onPointerDown={() => {
+            setSelected(null);
+            setEditing(false);
+          }}
           className="relative aspect-[9/16] w-full max-w-[300px] touch-none select-none overflow-hidden rounded-xl border bg-zinc-900 outline-none [container-type:inline-size] focus-visible:ring-2 focus-visible:ring-ring"
         >
           <img
@@ -236,8 +312,12 @@ export function LayerEditor({
             <div
               key={c.asset_id + i}
               role="button"
+              tabIndex={-1}
               aria-label={`Character ${i + 1}`}
-              onPointerDown={(e) => onLayerPointerDown(e, "char", i)}
+              onPointerDown={(e) => startDrag(e, "char", i)}
+              onPointerMove={onLayerPointerMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
               style={{
                 left: `${c.x * 100}%`,
                 top: `${c.y * 100}%`,
@@ -245,92 +325,112 @@ export function LayerEditor({
                 transform: `translate(-50%,-50%) scaleX(${c.flip ? -1 : 1})`,
               }}
               className={cn(
-                "absolute cursor-move",
-                selected?.kind === "char" && selected.index === i && "outline-2 outline-brand",
+                "absolute cursor-move touch-none",
+                selected?.kind === "char" && selected.index === i &&
+                  "outline outline-2 outline-brand",
               )}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={charFiles.get(c.asset_id)} alt="" draggable={false} className="w-full" />
+              <SelectionChrome kind="char" index={i} />
             </div>
           ))}
 
-          {texts.map((t, i) => (
-            <div
-              key={i}
-              role="button"
-              aria-label={`Text ${i + 1}`}
-              onPointerDown={(e) => onLayerPointerDown(e, "text", i)}
-              style={{
-                left: `${t.x * 100}%`,
-                top: `${t.y * 100}%`,
-                width: `${Math.max(20, t.scale * 100)}%`,
-                fontFamily: `'${t.font_id}', sans-serif`,
-                color: t.color,
-                textAlign: t.align,
-                fontSize: `calc(${t.scale} * 3.4cqw)`,
-                textShadow: "0 2px 6px rgb(0 0 0 / 45%)",
-                lineHeight: 1.1,
-                whiteSpace: "nowrap",
-              }}
-              className={cn(
-                "absolute -translate-x-1/2 -translate-y-1/2 cursor-move whitespace-pre-wrap px-1 font-bold uppercase",
-                selected?.kind === "text" && selected.index === i && "outline-2 outline-brand",
-              )}
-            >
-              {t.text}
-            </div>
-          ))}
-
-          {/* Selected-layer resize handle */}
-          {sel && (
-            <button
-              type="button"
-              aria-label="Resize layer"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                if (!selected || !canvasRef.current) return;
-                const rect = canvasRef.current.getBoundingClientRect();
-                resizeRef.current = {
-                  kind: selected.kind,
-                  index: selected.index,
-                  startX: e.clientX,
-                  startScale:
-                    selected.kind === "char"
-                      ? characters[selected.index]?.scale ?? 0.3
-                      : texts[selected.index]?.scale ?? 0.5,
-                  centerX: rect.left + rect.width / 2,
-                };
-                (e.target as HTMLElement).setPointerCapture(e.pointerId);
-              }}
-              style={{
-                left: `${sel.x * 100}%`,
-                top: `${sel.y * 100}%`,
-                width: `${sel.scale * 100}%`,
-              }}
-              className="absolute -translate-x-1/2 translate-y-1/2"
-            >
-              <span className="absolute bottom-0 right-0 block size-3 rounded-full border-2 border-background bg-brand shadow-sm" />
-            </button>
-          )}
+          {texts.map((t, i) => {
+            const isEditing = editing && selected?.kind === "text" && selected.index === i;
+            return (
+              <div
+                key={`${i}-${t.text.slice(0, 8)}`}
+                role="button"
+                tabIndex={-1}
+                aria-label={`Text ${i + 1}`}
+                onPointerDown={(e) => {
+                  if (isEditing) { e.stopPropagation(); return; }
+                  startDrag(e, "text", i);
+                }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  setSelected({ kind: "text", index: i });
+                  setEditing(true);
+                }}
+                onPointerMove={onLayerPointerMove}
+                onPointerUp={endDrag}
+                onPointerCancel={endDrag}
+                style={{
+                  left: `${t.x * 100}%`,
+                  top: `${t.y * 100}%`,
+                  fontFamily: `'${t.font_id}', sans-serif`,
+                  color: t.color,
+                  textAlign: t.align,
+                  fontSize: `calc(${t.scale} * 3.4cqw)`,
+                  textShadow: "0 2px 6px rgb(0 0 0 / 45%)",
+                  lineHeight: 1.1,
+                  whiteSpace: "nowrap",
+                }}
+                className={cn(
+                  "absolute max-w-[95cqw] -translate-x-1/2 -translate-y-1/2 cursor-move px-1 font-bold uppercase",
+                  selected?.kind === "text" && selected.index === i && "outline outline-2 outline-brand",
+                )}
+              >
+                {isEditing ? (
+                  <input
+                    autoFocus
+                    value={t.text}
+                    maxLength={140}
+                    onChange={(e) => setText(i, { text: e.target.value })}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === "Escape") {
+                        e.stopPropagation();
+                        setEditing(false);
+                      }
+                    }}
+                    className="w-40 rounded border bg-background/95 px-1 py-0.5 text-xs font-semibold normal-case text-foreground shadow-sm outline-none"
+                  />
+                ) : (
+                  t.text || " "
+                )}
+                <SelectionChrome kind="text" index={i} />
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Add buttons */}
-      <div className="flex items-center justify-center gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={addText}>
+      {/* Presets + add */}
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {TEXT_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              disabled={texts.length >= MAX_LAYERS}
+              onClick={() => addText({ y: 0.18 + Math.random() * 0.08, ...p.patch })}
+              className="cursor-pointer rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-brand/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => addText()}
+          disabled={texts.length >= MAX_LAYERS}
+        >
           <Type />
           Add text
         </Button>
         <p className="text-[13px] text-muted-foreground">
-          <Plus className="mr-1 inline size-3" />
-          add characters below, then drag here · arrows nudge · Del removes
+          drag to move · grip to resize · double-click text to edit · Del removes
         </p>
       </div>
 
       {/* Inspector */}
-      {sel && (
+      {sel && selected && (
         <div className="flex flex-col gap-3 rounded-lg border bg-card p-4">
-          {selected?.kind === "text" && (() => {
+          {selected.kind === "text" && (() => {
             const t = texts[selected.index];
             if (!t) return null;
             return (
@@ -379,11 +479,14 @@ export function LayerEditor({
                 <Row label="Size" hint={`${Math.round(t.scale * 100)}%`}>
                   <Slider min={10} max={95} step={1} value={[t.scale]} onValueChange={([v]) => setText(selected.index, { scale: v })} />
                 </Row>
-                <Button type="button" variant="destructive" size="sm" onClick={removeSelected}>Remove text</Button>
+                <Button type="button" variant="destructive" size="sm" onClick={() => removeAt("text", selected.index)}>
+                  <Trash2 />
+                  Remove text
+                </Button>
               </>
             );
           })()}
-          {selected?.kind === "char" && (() => {
+          {selected.kind === "char" && (() => {
             const c = characters[selected.index];
             if (!c) return null;
             return (
@@ -406,7 +509,10 @@ export function LayerEditor({
                 <Row label="Size" hint={`${Math.round(c.scale * 100)}%`}>
                   <Slider min={5} max={90} step={1} value={[c.scale]} onValueChange={([v]) => setChar(selected.index, { scale: v })} />
                 </Row>
-                <Button type="button" variant="destructive" size="sm" onClick={removeSelected}>Remove character</Button>
+                <Button type="button" variant="destructive" size="sm" onClick={() => removeAt("char", selected.index)}>
+                  <Trash2 />
+                  Remove character
+                </Button>
               </>
             );
           })()}
