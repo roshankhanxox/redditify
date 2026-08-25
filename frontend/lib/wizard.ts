@@ -64,6 +64,23 @@ export const wizardSchema = z
     expressiveness: z.enum(["natural", "expressive", "dramatic"]),
     tts_pitch: z.number().int().min(-12).max(12),
     scene_id: z.string(),
+    characters: z.array(z.object({
+      asset_id: z.string(),
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+      scale: z.number().min(0.05).max(0.9),
+      flip: z.boolean(),
+      bob: z.boolean(),
+    })).max(3),
+    text_overlays: z.array(z.object({
+      text: z.string().min(1).max(140),
+      font_id: z.string().min(1),
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+      scale: z.number().min(0.1).max(0.95),
+      color: z.string(),
+      align: z.enum(["left", "center", "right"]),
+    })).max(3),
     // Look — background (story template)
     gameplay_category: z.string(),
     gameplay_source: z.enum(["library", "user"]),
@@ -109,6 +126,8 @@ export const DEFAULT_WIZARD_STATE: WizardState = {
   expressiveness: "expressive",
   tts_pitch: 0,
   scene_id: "rainbow",
+  characters: [],
+  text_overlays: [],
   gameplay_category: "any",
   gameplay_source: "library",
   background_id: "",
@@ -187,7 +206,14 @@ export function buildPayload(s: WizardState) {
     story: s.story.trim(),
     settings:
       s.template === "meme"
-        ? { template: "meme", scene_id: s.scene_id, tts_pitch: s.tts_pitch, ...base }
+        ? {
+            template: "meme",
+            scene_id: s.scene_id,
+            tts_pitch: s.tts_pitch,
+            characters: s.characters,
+            text_overlays: s.text_overlays,
+            ...base,
+          }
         : {
             template: "story",
             gameplay_category: s.gameplay_category,
@@ -251,6 +277,8 @@ export function stateFromJob(job: {
   const template = pick(st.template, ["story", "meme", "image"] as const, "story");
   return {
     template,
+    characters: Array.isArray(st.characters) ? st.characters : [],
+    text_overlays: Array.isArray(st.text_overlays) ? st.text_overlays : [],
     scene_id:
       typeof st.scene_id === "string" && st.scene_id ? st.scene_id : DEFAULT_WIZARD_STATE.scene_id,
     tts_pitch: num(st.tts_pitch, 0, -12, 12),

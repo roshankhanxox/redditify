@@ -123,3 +123,68 @@ export async function uploadBackground(file: File, hooks: UploadHooks = {}): Pro
   }
   throw new Error("Processing timed out — check My footage in a minute")
 }
+
+/* ------------------------------------------------------------------ */
+/* Character assets (V2 Phase 7)                                       */
+/* ------------------------------------------------------------------ */
+
+export interface CharacterAsset {
+  id: string
+  label: string
+  status: "pending" | "ready" | "failed"
+  width: number | null
+  height: number | null
+  file_size_bytes: number | null
+  bg_removed: boolean
+  error_message: string | null
+  created_at: string
+}
+
+/** Upload one character image: presigned PUT, optional in-browser background
+ *  removal (WASM), then server-side normalization to RGBA WebP. */
+export async function uploadCharacter(
+  file: File,
+  opts: { bgRemoved?: boolean; onPhase?: (p: "uploading" | "processing") => void } = {},
+): Promise<CharacterAsset> {
+  if (file.size === 0) throw new Error("Empty file")
+  let blob: Blob = file
+  let bgRemoved = false
+
+  if (opts.bgRemoved) {
+    try {
+      const { removeBackground } = await import("@imgly/background-removal")
+      const out = await removeBackground(file, {
+        publicPath:
+          process.env.NEXT_PUBLIC_IMGLY_PATH || "https://staticimgly.com/@imgly/background-removal-data/latest/dist/",
+      })
+      blob = out
+      bgRemoved = true
+    } catch {
+      // Model assets unavailable — fall back to the original image.
+    }
+  }
+
+  opts.onPhase?.("uploading")
+  const init = await api
+    .post<{ asset_id: string; url: string }>("/characters/init", {
+      label: file.name.slice(0, 80),
+      size_bytes: blob.size,
+      content_type: bgRemoved ? "image/png" : file.type || "image/png",
+      bg_removed: bgRemoved,
+    })
+    .then((r) => r.data)
+
+  const putRes = await fetch(init.url, { method: "PUT", body: blob })
+  if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`)
+
+  opts.onPhase?.("processing")
+  return api.post<CharacterAsset>(`/characters/${init.asset_id}/complete`).then((r) => r.data)
+}
+
+export async function listCharacters() {
+  return api.get<{ items: CharacterAsset[] }>("/characters").then((r) => r.data)
+}
+
+export async function deleteCharacter(id: string) {
+  return api.delete(`/characters/${id}`).then((r) => r.data)
+}

@@ -81,10 +81,12 @@ def render_meme_video(
     output_path: str,
     subs: str | None = None,
     tmp_dir: str = "/tmp/reelbot",
+    characters: list[dict] | None = None,
+    text_pngs: list[dict] | None = None,
 ) -> str:
-    """Meme-template composite: procedural/animated scene background + voiceover
-    (+ burned-in captions). Same styling contract as render_video — the .ass
-    file owns all caption styling at PlayRes 1080x1920."""
+    """Meme-template composite. Layer order (z-law): scene → characters →
+    text overlays → word-synced captions last. Placement is normalized
+    center-anchored {x, y}; character scale is a fraction of frame width."""
     duration = get_duration(audio_path)
 
     inputs = scene_input_args(scene, duration, tmp_dir)
@@ -92,19 +94,52 @@ def render_meme_video(
     audio_idx = inputs.count("-i")
     inputs += ["-i", audio_path]
 
+    # Layer order (z-law): scene -> characters -> text overlays -> captions.
+    chain_parts = ["[0:v]scale=1080:1920,setsar=1[bg]"]
+    current = "[bg]"
+    next_idx = audio_idx + 1
+
+    for i, ch in enumerate(characters or []):
+        w = max(32, int(1080 * ch["scale"]))
+        x, y = ch["x"], ch["y"]
+        transforms = f"scale={w}:-1"
+        if ch.get("flip"):
+            transforms += ",hflip"
+        bob = "+sin(t*2)*20" if ch.get("bob") else ""
+        label = f"char{i}"
+        out_label = f"co{i}"
+        chain_parts.append(f"[{next_idx}:v]{transforms}[{label}]")
+        chain_parts.append(
+            f"{current}[{label}]overlay=x='W*{x}-w/2':y='H*{y}-h/2{bob}'[{out_label}]"
+        )
+        current = f"[{out_label}]"
+        inputs += ["-i", ch["path"]]
+        next_idx += 1
+
+    for i, tp in enumerate(text_pngs or []):
+        x, y = tp["x"], tp["y"]
+        # Text PNGs are pre-rendered at frame scale — overlay directly.
+        chain_parts.append(f"{current}overlay=x='W*{x}-w/2':y='H*{y}-h/2'[tl{i}]")
+        current = f"[tl{i}]"
+        inputs += ["-i", tp["path"]]
+        next_idx += 1
+
     if subs:
         sub_path = subs.replace("\\", "/").replace(":", "\\:")
-        chain = (
-            "[0:v]scale=1080:1920,setsar=1[bg];"
-            f"[bg]subtitles='{sub_path}'[vout]"
-        )
+        chain_parts.append(f"{current}subtitles='{sub_path}'[vout]")
+        final = "[vout]"
     else:
-        chain = "[0:v]scale=1080:1920,setsar=1[vout]"
+        final = current
+        # A trailing split needs a named endpoint when layers exist.
+        if len(chain_parts) > 1:
+            chain_parts[-1] = chain_parts[-1].rsplit("[", 1)[0] + final
+
+    filter_complex = ";".join(chain_parts)
 
     run_ffmpeg([
         *inputs,
-        "-filter_complex", chain,
-        "-map", "[vout]",
+        "-filter_complex", filter_complex,
+        "-map", final,
         "-map", f"{audio_idx}:a",
         "-t", f"{duration + 0.5:.3f}",
         "-c:v", "libx264", "-crf", "18", "-preset", "fast",

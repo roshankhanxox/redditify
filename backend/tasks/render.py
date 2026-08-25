@@ -127,6 +127,7 @@ def generate_reel(self, job_id: str):
             # gameplay. Pitch is applied AFTER transcription so the word-synced
             # subtitles above still match the unshifted audio timeline.
             from services import scenes as scenes_service
+            from services.text_overlay import render_text_overlay
 
             scene = scenes_service.get_scene(cfg.get("scene_id")) or scenes_service.SCENES[0]
             pitch = float(cfg.get("tts_pitch") or 0)
@@ -138,12 +139,47 @@ def generate_reel(self, job_id: str):
                 )
 
             set_status("COMPOSITING_VIDEO")
+
+            # Character assets: ownership was validated at job creation; here we
+            # only resolve storage paths (resolve() cache-downloads on S3).
+            from models import UserBackground
+
+            characters = []
+            char_specs = cfg.get("characters", [])
+            if char_specs:
+                with SyncSessionLocal() as db:
+                    rows = {
+                        str(r.id): r.clip_key
+                        for r in db.query(UserBackground)
+                        .filter(
+                            UserBackground.id.in_([uuid.UUID(c["asset_id"]) for c in char_specs]),
+                            UserBackground.user_id == job.user_id,
+                            UserBackground.kind == "character",
+                            UserBackground.status == "ready",
+                        )
+                        .all()
+                    }
+                for c in char_specs:
+                    key = rows.get(c["asset_id"])
+                    if not key:
+                        continue
+                    path = storage.resolve(key)
+                    if path:
+                        characters.append({**c, "path": path})
+
+            text_pngs = [
+                {**t, "path": render_text_overlay(t, os.path.join(tmp, f"text-{i}.png"))}
+                for i, t in enumerate(cfg.get("text_overlays", []))
+            ]
+
             output_path = video.render_meme_video(
                 scene,
                 voice_for_render,
                 os.path.join(tmp, "output.mp4"),
                 subs=srt_path if captions_on else None,
                 tmp_dir=tmp,
+                characters=characters,
+                text_pngs=text_pngs,
             )
         else:
             set_status("PICKING_GAMEPLAY")

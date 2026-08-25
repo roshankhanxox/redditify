@@ -1,3 +1,4 @@
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +16,7 @@ from services.quota import check_quota, increment_quota
 from services.storage import presign_get, resolve
 from services.tts import VOICE_CATALOG, VALID_EXPRESSIVENESS, VALID_TTS_PROVIDERS
 from services.scenes import DEFAULT_SCENE_ID, get_scene
+from services.fonts import get_font_path
 from tasks.render import generate_reel
 
 router = APIRouter(tags=["jobs"])
@@ -42,6 +44,66 @@ _LEGACY_VOICES = {
     "gigi": "jessica",
     "jessie": "jessica",
 }
+
+
+def _clamp_float(s: dict, key: str, default: float, lo: float, hi: float) -> float:
+    try:
+        return max(lo, min(hi, float(s.get(key, default))))
+    except (TypeError, ValueError):
+        return default
+
+
+def _sanitize_layers(s: dict) -> dict:
+    """characters[] / text_overlays[] for the meme template, read from the
+    RAW client payload. Normalized center-anchored placement, whitelisted
+    enums, hard caps. Anything failing validation is dropped (not defaulted)
+    so hostile shapes never reach ffmpeg/PIL."""
+    raw_chars = s.get("characters")
+    characters = []
+    if isinstance(raw_chars, list):
+        for c in raw_chars[:3]:
+            if not isinstance(c, dict):
+                continue
+            asset_id = str(c.get("asset_id") or "")
+            try:
+                uuid.UUID(asset_id)
+            except ValueError:
+                continue
+            characters.append({
+                "asset_id": asset_id,
+                "x": _clamp_float(c, "x", 0.5, 0.0, 1.0),
+                "y": _clamp_float(c, "y", 0.5, 0.0, 1.0),
+                "scale": _clamp_float(c, "scale", 0.35, 0.05, 0.9),
+                "flip": bool(c.get("flip")),
+                "bob": bool(c.get("bob")),
+            })
+
+
+    raw_texts = s.get("text_overlays")
+    texts = []
+    if isinstance(raw_texts, list):
+        color_re = re.compile(r"^#[0-9a-fA-F]{6}$")
+        for t in raw_texts[:3]:
+            if not isinstance(t, dict):
+                continue
+            text = str(t.get("text") or "").replace("\r\n", "\n")[:140]
+            if not text.strip():
+                continue
+            font_id = str(t.get("font_id") or "")
+            if get_font_path(font_id) is None:
+                continue
+            color = str(t.get("color") or "#ffffff")
+            align = t.get("align") if t.get("align") in ("left", "center", "right") else "center"
+            texts.append({
+                "text": text,
+                "font_id": font_id,
+                "size": _clamp_int(t, "size", 96, 24, 220),
+                "color": color.lower() if color_re.match(color) else "#ffffff",
+                "align": align,
+                "x": _clamp_float(t, "x", 0.5, 0.0, 1.0),
+                "y": _clamp_float(t, "y", 0.35, 0.0, 1.0),
+            })
+    return {"characters": characters, "text_overlays": texts}
 
 
 def _clamp_int(s: dict, key: str, default: int, lo: int, hi: int) -> int:
@@ -123,6 +185,12 @@ def _sanitize_settings(s: dict) -> dict:
         out["max_words"] = max(50, min(2000, int(s.get("max_words", 1200))))
     except (TypeError, ValueError):
         out["max_words"] = 1200
+
+    if out["template"] == "meme":
+        out.update(_sanitize_layers(s))
+    else:
+        out["characters"] = []
+        out["text_overlays"] = []
     return out
 
 
@@ -189,6 +257,23 @@ async def create_job(
             raise HTTPException(403, detail="Not your background")
         if bg.status != "ready":
             raise HTTPException(422, detail="Background is not ready")
+
+    char_ids = [c["asset_id"] for c in job_settings.get("characters", [])]
+    if char_ids:
+        rows = (
+            await db.scalars(
+                select(UserBackground).where(UserBackground.id.in_(
+                    [uuid.UUID(i) for i in char_ids]
+                ))
+            )
+        ).all()
+        owned = {
+            str(r.id)
+            for r in rows
+            if r.user_id == user.id and r.kind == "character" and r.status == "ready"
+        }
+        if not set(char_ids).issubset(owned):
+            raise HTTPException(403, detail="Unknown character asset")
 
     retention = job_settings.pop("retention", "ephemeral")
     if retention == "retain":
