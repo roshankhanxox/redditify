@@ -1,444 +1,117 @@
-"use client";
-
-import { useState, useRef } from "react";
-import { useSession } from "next-auth/react";
-import useSWR from "swr";
-import { toast } from "sonner";
-import { api, downloadReel } from "@/lib/api";
-import { UserBackgroundPanel } from "@/components/background-picker";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Slider } from "@/components/ui/slider";
+import Link from "next/link";
+import { ArrowRight, ImageIcon, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { AssetList, Job } from "@/lib/types";
-import { DEFAULT_RENDER_SETTINGS, type RenderSettings } from "@/lib/types";
-import { VOICES, TTS_PROVIDERS } from "@/lib/voices";
-import { CustomizePanel, Segmented } from "@/components/customize-panel";
+import { Card, CardContent } from "@/components/ui/card";
+import { TEMPLATES } from "@/lib/wizard";
 
-const STATUS_STEPS: Record<string, number> = {
-  QUEUED: 5,
-  GENERATING_VOICEOVER: 25,
-  TRANSCRIBING: 45,
-  RENDERING_TITLE_CARD: 60,
-  PICKING_GAMEPLAY: 70,
-  COMPOSITING_VIDEO: 85,
-  UPLOADING: 95,
-  DONE: 100,
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  QUEUED: "Queued...",
-  GENERATING_VOICEOVER: "Generating voiceover...",
-  TRANSCRIBING: "Transcribing for subtitles...",
-  RENDERING_TITLE_CARD: "Rendering title card...",
-  PICKING_GAMEPLAY: "Picking gameplay clip...",
-  COMPOSITING_VIDEO: "Compositing video...",
-  UPLOADING: "Uploading...",
-  DONE: "Done!",
-};
-
-const DURATIONS = [
-  { label: "~30s", words: 400 },
-  { label: "~60s", words: 800 },
-  { label: "~90s", words: 1200 },
-  { label: "Full post", words: 2000 },
-];
-
-const fetcher = (url: string) => api.get(url).then((r) => r.data);
-
-export default function DashboardPage() {
-  const { data: session } = useSession();
-
-  const [title, setTitle] = useState("");
-  const [subreddit, setSubreddit] = useState("");
-  const [story, setStory] = useState("");
-  const [voice, setVoice] = useState("male");
-  const [ttsProvider, setTtsProvider] = useState("auto");
-  const [speed, setSpeed] = useState(1.1);
-  const [expressiveness, setExpressiveness] = useState<"natural" | "expressive" | "dramatic">("expressive");
-  const [render, setRender] = useState<RenderSettings>(DEFAULT_RENDER_SETTINGS);
-  const [category, setCategory] = useState("any");
-  const [bgSource, setBgSource] = useState<"library" | "user">("library");
-  const [backgroundId, setBackgroundId] = useState<string>("");
-  const [retention, setRetention] = useState<"ephemeral" | "retain">("ephemeral");
-  const [durationIdx, setDurationIdx] = useState(2);
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-
-  const wordCount = story.trim() ? story.trim().split(/\s+/).length : 0;
-
-  const { data: quota } = useSWR<{ daily_used: number; daily_limit: number; unlimited?: boolean; plan?: string }>(
-    session ? "/quota/me" : null,
-    fetcher,
-    { refreshInterval: 30_000 },
-  );
-  const canRetain = session?.user?.role === "admin" || quota?.plan === "premium";
-  const { data: assetData } = useSWR<AssetList>(session ? "/assets" : null, fetcher);
-
-  function generate() {
-    if (!title.trim()) return toast.error("Give your reel a title");
-    if (!story.trim()) return toast.error("Paste a story first");
-    if (bgSource === "user" && !backgroundId)
-      return toast.error("Pick or upload your own footage first");
-    setCreating(true);
-    api
-      .post<{ job_id: string; duplicate: boolean }>("/jobs", {
-        title,
-        subreddit: subreddit || null,
-        story,
-        settings: {
-          voice,
-          tts_provider: ttsProvider,
-          speed,
-          expressiveness,
-          ...render,
-          gameplay_category: category,
-          gameplay_source: bgSource,
-          background_id: bgSource === "user" ? backgroundId : undefined,
-          retention,
-          max_words: DURATIONS[durationIdx].words,
-        },
-      })
-      .then((r) => setJobId(r.data.job_id))
-      .catch((err) => {
-        toast.error(err?.response?.data?.detail || "Could not create job");
-      })
-      .finally(() => setCreating(false));
-  }
-
-  function reset() {
-    setJobId(null);
-    setTitle("");
-    setStory("");
-  }
-
+function StoryThumb() {
   return (
-    <>
-      <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-        <header className="mb-6 flex items-center justify-between">
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Create a Reel</h1>
-          <Badge variant="secondary">
-            {quota
-              ? quota.unlimited
-                ? "Unlimited"
-                : `${Math.max(0, quota.daily_limit - quota.daily_used)} videos left today`
-              : "..."}
-          </Badge>
-        </header>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        {/* Left — content */}
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>The Story</CardTitle>
-            <CardDescription>Paste any Reddit-style post or story text</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                placeholder={'e.g. "AITA for returning my roommate\'s vacuum?"'}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="subreddit">Subreddit label (optional)</Label>
-              <Input
-                id="subreddit"
-                placeholder="AskReddit"
-                value={subreddit}
-                onChange={(e) => setSubreddit(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="story">Story / post content</Label>
-                  <span className="text-[13px] tabular-nums text-muted-foreground">{wordCount} words</span>
-              </div>
-              <Textarea
-                id="story"
-                rows={14}
-                placeholder="Paste the full post text here..."
-                value={story}
-                onChange={(e) => setStory(e.target.value)}
-                className="resize-y"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Right — settings + generation. Bounded to the viewport; [&>*]:shrink-0
-            is essential: the Cards are flex items with overflow-hidden, so
-            without it they shrink-to-fit instead of overflowing into a
-            scrollbar (content got clipped with nothing to scroll). Scrollbar
-            styling is global (globals.css). */}
-        <div className="flex max-h-[calc(100dvh-6rem)] flex-col gap-6 self-start overflow-y-auto pr-1 [&>*]:shrink-0 lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-5">
-              <Tabs defaultValue="voice" className="w-full gap-4">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="voice">Voice</TabsTrigger>
-                  <TabsTrigger value="look">Look</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="voice" className="flex flex-col gap-5">
-                  <div className="flex flex-col gap-2">
-                    <Label>Voice Engine</Label>
-                    <RadioGroup
-                      value={ttsProvider}
-                      onValueChange={setTtsProvider}
-                      className="flex flex-col gap-2"
-                    >
-                      {TTS_PROVIDERS.map((p) => (
-                        <div key={p.id} className="flex items-center gap-2">
-                          <RadioGroupItem value={p.id} id={`tts-${p.id}`} />
-                          <Label htmlFor={`tts-${p.id}`} className="font-normal">
-                            {p.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label>Voice</Label>
-                    <Select value={voice} onValueChange={setVoice}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {["Male", "Female", "Neutral"].map((group) => (
-                          <div key={group}>
-                            <p className="px-2 py-1 text-[13px] font-medium text-muted-foreground">
-                              {group}
-                            </p>
-                            {VOICES.filter((v) => v.group === group).map((v) => (
-                              <SelectItem key={v.id} value={v.id}>
-                                {v.label}
-                              </SelectItem>
-                            ))}
-                          </div>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <Label>Speech Speed</Label>
-                      <span className="text-sm text-muted-foreground">{speed.toFixed(2)}×</span>
-                    </div>
-                    <Slider
-                      min={0.8}
-                      max={1.5}
-                      step={0.05}
-                      value={[speed]}
-                      onValueChange={([v]) => setSpeed(v)}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label>Expressiveness</Label>
-                    <Segmented
-                      value={expressiveness}
-                      onChange={(v) => setExpressiveness(v)}
-                      options={[
-                        { value: "natural", label: "Natural" },
-                        { value: "expressive", label: "Expressive" },
-                        { value: "dramatic", label: "Dramatic" },
-                      ]}
-                    />
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="look" className="pt-1">
-                  <CustomizePanel
-                    value={render}
-                    onChange={(patch) => setRender((r) => ({ ...r, ...patch }))}
-                  />
-                </TabsContent>
-              </Tabs>
-
-              <div className="flex flex-col gap-3">
-                <Label>Gameplay Background</Label>
-                <RadioGroup
-                  value={bgSource}
-                  onValueChange={(v) => setBgSource(v as "library" | "user")}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="library" id="bgsrc-library" />
-                    <Label htmlFor="bgsrc-library" className="font-normal">
-                      Library
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="user" id="bgsrc-user" />
-                    <Label htmlFor="bgsrc-user" className="font-normal">
-                      My footage
-                    </Label>
-                  </div>
-                </RadioGroup>
-
-                {bgSource === "library" ? (
-                  <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(assetData?.categories ?? ["any"]).map((c) => (
-                        <SelectItem key={c} value={c} className="capitalize">
-                          {c === "any" ? "Any" : c.replace("_", " ")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <UserBackgroundPanel value={backgroundId || undefined} onChange={setBackgroundId} />
-                )}
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <Label>Max Duration</Label>
-                  <span className="text-sm text-muted-foreground">{DURATIONS[durationIdx].label}</span>
-                </div>
-                <Slider
-                  min={0}
-                  max={3}
-                  step={1}
-                  value={[durationIdx]}
-                  onValueChange={([v]) => setDurationIdx(v)}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <Label>Keep the finished file?</Label>
-                  {!canRetain && (
-                    <Badge variant="outline" className="text-xs uppercase tracking-wide">
-                      premium
-                    </Badge>
-                  )}
-                </div>
-                <RadioGroup
-                  value={retention}
-                  onValueChange={(v) => setRetention(v as "ephemeral" | "retain")}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="ephemeral" id={`ret-${"ephemeral"}`} />
-                    <Label htmlFor={`ret-${"ephemeral"}`} className="font-normal">
-                      Auto-delete (~15 min)
-                    </Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="retain" id="ret-retain" disabled={!canRetain} />
-                    <Label htmlFor="ret-retain" className={`font-normal ${canRetain ? "" : "opacity-50"}`}>
-                      Keep until I delete
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {jobId ? (
-            <JobStatusTracker jobId={jobId} onReset={reset} />
-          ) : (
-            <Button size="lg" className="w-full" onClick={generate} disabled={creating}>
-              {creating ? "Starting..." : "Generate Reel"}
-            </Button>
-          )}
-        </div>
+    <div className="relative aspect-[9/16] w-20 overflow-hidden rounded-md border bg-zinc-900">
+      <div className="absolute inset-x-1.5 top-1.5 rounded-sm bg-black/70 px-1 py-0.5">
+        <p className="text-[6px] font-semibold text-white">r/AskReddit</p>
+        <div className="mt-0.5 h-0.5 w-3/4 rounded-full bg-zinc-600" />
       </div>
-      </div>
-    </>
+      <p className="absolute inset-x-0 bottom-2 text-center text-[8px] font-extrabold tracking-tight text-white">
+        SO I QUIT MY JOB
+      </p>
+    </div>
   );
 }
 
-function JobStatusTracker({ jobId, onReset }: { jobId: string; onReset: () => void }) {
-  const isTerminal = (s?: string) => s === "DONE" || s === "FAILED";
-
-  // Exponential backoff: 1.5s → 2.25s → 3.4s … capped at 12s. Resets whenever
-  // the status changes (a sign of progress) and stops entirely on terminal.
-  const pollsRef = useRef(0);
-  const lastStatusRef = useRef<string | undefined>(undefined);
-
-  const { data: job } = useSWR<Job>(`/jobs/${jobId}`, fetcher, {
-    refreshInterval: (latest) => {
-      if (latest && isTerminal(latest.status)) return 0;
-      return Math.min(1500 * Math.pow(1.5, pollsRef.current++), 12000);
-    },
-    revalidateOnFocus: true,
-    onSuccess: (d) => {
-      if (d.status !== lastStatusRef.current) {
-        pollsRef.current = 0;
-        lastStatusRef.current = d.status;
-      }
-    },
-  });
-
-  const status = job?.status ?? "QUEUED";
-  const pct = STATUS_STEPS[status] ?? 0;
-
-  if (status === "DONE") {
-    return (
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-6">
-          <p className="font-medium text-center">Your reel is ready!</p>
-          <Button className="w-full" onClick={() => downloadReel(jobId, "reel.mp4")}>
-            Download MP4
-          </Button>
-          <Button variant="outline" className="w-full" onClick={onReset}>
-            Generate Another
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (status === "FAILED") {
-    return (
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-6">
-          <p className="font-medium text-destructive text-center">Generation failed</p>
-          <p className="text-sm text-muted-foreground break-words line-clamp-4">
-            {job?.error_message || "Unknown error"}
-          </p>
-          <Button variant="outline" className="w-full" onClick={onReset}>
-            Try Again
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
+function MemeThumb() {
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 p-6">
-        <Progress value={pct} />
-        <p className="text-sm text-muted-foreground text-center">{STATUS_LABELS[status]}</p>
-        <p className="text-[13px] tabular-nums text-muted-foreground text-center">{pct}%</p>
-      </CardContent>
-    </Card>
+    <div className="relative aspect-[9/16] w-20 overflow-hidden rounded-md border bg-gradient-to-b from-fuchsia-500 via-orange-400 to-yellow-300">
+      <div className="absolute left-1/2 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black/60 bg-white/90 p-0.5">
+        <div className="size-full rounded-full bg-zinc-800" />
+      </div>
+      <p className="absolute inset-x-0 bottom-2 text-center text-[8px] font-black uppercase italic text-white [text-shadow:_0_1px_2px_rgb(0_0_0_/_60%)]">
+        POV:
+      </p>
+    </div>
+  );
+}
+
+function ImageThumb() {
+  return (
+    <div className="relative aspect-[9/16] w-20 overflow-hidden rounded-md border bg-muted">
+      <ImageIcon className="absolute left-1/2 top-1/2 size-5 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/50" />
+      <div className="absolute inset-x-1 bottom-1.5 h-1.5 rounded-sm bg-background/85 px-0.5" />
+    </div>
+  );
+}
+
+const THUMBS = {
+  story: <StoryThumb />,
+  meme: <MemeThumb />,
+  image: <ImageThumb />,
+} as const;
+
+export default function CreatePage() {
+  return (
+    <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+      <header className="mb-8">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">
+          Create a reel
+        </h1>
+        <p className="mt-1 text-base text-muted-foreground">
+          Pick a format to get started — you can fine-tune everything after.
+        </p>
+      </header>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {TEMPLATES.map((t) => {
+          const live = t.status === "live";
+          const body = (
+            <>
+              <div className="flex aspect-[4/3] items-center justify-center rounded-lg border bg-muted/40">
+                {THUMBS[t.id]}
+              </div>
+              <div className="flex flex-col gap-1.5 p-5 pt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-heading text-lg font-semibold tracking-tight">
+                    {t.name}
+                  </h2>
+                  {!live && (
+                    <Badge variant="outline" className="text-xs">
+                      Coming soon
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {t.tagline}
+                </p>
+                {live && (
+                  <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand">
+                    Start creating
+                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                )}
+              </div>
+            </>
+          );
+
+          const cardClass = live
+            ? "group cursor-pointer transition-colors hover:border-brand/50"
+            : "cursor-not-allowed opacity-55";
+
+          return live ? (
+            <Card key={t.id} className={`overflow-hidden ${cardClass}`}>
+              <Link href={`/dashboard/create/${t.id}`} className="block outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                {body}
+              </Link>
+            </Card>
+          ) : (
+            <Card key={t.id} className={`overflow-hidden ${cardClass}`} aria-disabled>
+              {body}
+            </Card>
+          );
+        })}
+      </div>
+
+      <p className="mt-8 flex items-center gap-2 text-[13px] text-muted-foreground">
+        <Sparkles className="size-3.5 text-brand" />
+        New formats ship regularly — Meme Studio and Custom Image are next.
+      </p>
+    </div>
   );
 }
