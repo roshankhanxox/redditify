@@ -14,19 +14,35 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# Curated voice catalog — every entry works on both providers (with an
-# equivalent-sounding fallback mapping for the free engine).
+# Curated voice catalog — ONLY ids verified to synthesize (HTTP 200) on the
+# configured API key, sourced from ElevenLabs' official premade roster plus
+# its Voice Library picks that happen to be plan-included. Anything else 402s
+# ("payment_required") at render time, so never add an id without testing.
 VOICE_CATALOG: dict[str, dict] = {
-    "male":       {"label": "Daniel · Deep Storyteller", "el": "onwK4e9ZLuTAKqWW03F9", "edge": "en-US-GuyNeural"},
-    "adam":       {"label": "Adam · Warm Narrator",      "el": "pNInz6obpgDQGcFmaJgB", "edge": "en-US-ChristopherNeural"},
-    "josh":       {"label": "Josh · Energetic Male",     "el": "TxGEqnHWrfWFTfGW9XjX", "edge": "en-US-EricNeural"},
-    "brian":      {"label": "Brian · Casual Male",       "el": "nPczCjzI2devNBz1zQrb", "edge": "en-US-BrianNeural"},
-    "female":     {"label": "Sarah · Friendly Female",   "el": "EXAVITQu4vr4xnSDxMaL", "edge": "en-US-JennyNeural"},
-    "rachel":     {"label": "Rachel · Calm Female",      "el": "21m00Tcm4TlvDq8ikWAM", "edge": "en-US-AriaNeural"},
-    "emily":      {"label": "Emily · Bright Female",     "el": "LcfcDJNUP1GQjkzn1xUU", "edge": "en-US-MichelleNeural"},
-    "charlotte":  {"label": "Charlotte · Posh Female",   "el": "XB0fDUnXU5powFXDhCwa", "edge": "en-US-AvaNeural"},
-    "george":     {"label": "George · British Narrator", "el": "JBFqnCBsd6RMkjVDRZzb", "edge": "en-GB-RyanNeural"},
-    "gigi":       {"label": "Gigi · Sassy Female",       "el": "jBpfuIE2acCO8z3wKNLl", "edge": "en-GB-SoniaNeural"},
+    # --- Male · premade ---
+    "brian":    {"label": "Brian · Resonant American",        "el": "nPczCjzI2devNBz1zQrb", "edge": "en-US-BrianNeural"},
+    "charlie":  {"label": "Charlie · Energetic Australian",   "el": "IKne3meq5aSn9XLyUdCD", "edge": "en-AU-WilliamNeural"},
+    "daniel":   {"label": "Daniel · British Broadcast",       "el": "onwK4e9ZLuTAKqWW03F9", "edge": "en-GB-RyanNeural"},
+    "george":   {"label": "George · Warm British Storyteller","el": "JBFqnCBsd6RMkjVDRZzb", "edge": "en-GB-ThomasNeural"},
+    "eric":     {"label": "Eric · Smooth Conversational",     "el": "cjVigY5qzO86Huf0OWal", "edge": "en-US-EricNeural"},
+    "liam":     {"label": "Liam · Young & Energetic",         "el": "TX3LPaxmHKxFdv7VOQHJ", "edge": "en-US-ChristopherNeural"},
+    "roger":    {"label": "Roger · Laid-back American",       "el": "CwhRBWXzGAHq8TQ4Fs17", "edge": "en-US-GuyNeural"},
+    "callum":   {"label": "Callum · Dark & Gravelly",         "el": "N2lVS1w4EtoT3dr4eOWO", "edge": "en-GB-RyanNeural"},
+    "harry":    {"label": "Harry · Animated & Intense",       "el": "SOYHLrjzK2X1ezoPC6cr", "edge": "en-US-GuyNeural"},
+    "bill":     {"label": "Bill · Warm Documentarian",        "el": "pqHfZKP75CvOlQylNhV4", "edge": "en-US-GuyNeural"},
+    # --- Male · library (plan-included) ---
+    "adam":     {"label": "Adam · Deep All-Rounder",          "el": "pNInz6obpgDQGcFmaJgB", "edge": "en-US-ChristopherNeural"},
+    "will":     {"label": "Will · Casual Podcast",            "el": "bIHbv24MWmeRgasZH58o", "edge": "en-US-EricNeural"},
+    "antoni":   {"label": "Antoni · Smooth Articulate",       "el": "ErXwobaYiN019PkySvjV", "edge": "en-US-GuyNeural"},
+    # --- Female · premade ---
+    "alice":    {"label": "Alice · Friendly British",         "el": "Xb7hH8MSUJpSbSDYk0k2", "edge": "en-GB-LibbyNeural"},
+    "jessica":  {"label": "Jessica · Playful & Trendy",       "el": "cgSgspJ2msm6clMCkdW9", "edge": "en-US-AnaNeural"},
+    "laura":    {"label": "Laura · Sunny & Quirky",           "el": "FGY2WhTYpPnrIDTdsKH5", "edge": "en-US-AriaNeural"},
+    "lily":     {"label": "Lily · Velvety British",           "el": "pFZP5JQG7iQjIQuC4Bku", "edge": "en-GB-SoniaNeural"},
+    "matilda":  {"label": "Matilda · Professional Alto",      "el": "XrExE9yKIg1WjnnlVkGX", "edge": "en-US-AvaNeural"},
+    "sarah":    {"label": "Sarah · Confident & Warm",         "el": "EXAVITQu4vr4xnSDxMaL", "edge": "en-US-JennyNeural"},
+    # --- Neutral ---
+    "river":    {"label": "River · Relaxed Androgynous",      "el": "SAz9YHcvj6GT2YYXdXww", "edge": "en-US-EmmaNeural"},
 }
 
 VALID_TTS_PROVIDERS = ("auto", "elevenlabs", "edge")
@@ -57,7 +73,7 @@ def _split_sentences(text: str) -> list[str]:
 def _elevenlabs(text: str, voice: str, path: str, speed: float = 1.0,
                 expressiveness: str = "expressive") -> str:
     client = ElevenLabs(api_key=settings.ELEVENLABS_API_KEY)
-    voice_id = VOICE_CATALOG.get(voice, {}).get("el") or VOICE_CATALOG["male"]["el"]
+    voice_id = VOICE_CATALOG.get(voice, {}).get("el") or VOICE_CATALOG["daniel"]["el"]
     level = _EL_EXPRESSIVENESS.get(expressiveness, _EL_EXPRESSIVENESS["expressive"])
     audio = client.text_to_speech.convert(
         voice_id=voice_id,
@@ -78,7 +94,7 @@ def _elevenlabs(text: str, voice: str, path: str, speed: float = 1.0,
 
 async def _edge(text: str, voice: str, path: str, speed: float = 1.0,
                 expressiveness: str = "expressive") -> str:
-    edge_voice = VOICE_CATALOG.get(voice, {}).get("edge") or VOICE_CATALOG["male"]["edge"]
+    edge_voice = VOICE_CATALOG.get(voice, {}).get("edge") or VOICE_CATALOG["daniel"]["edge"]
     base_rate = int(round((speed - 1.0) * 100))
     contour = _EDGE_CONTOUR.get(expressiveness, _EDGE_CONTOUR["expressive"])
     sentences = _split_sentences(text)

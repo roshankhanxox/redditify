@@ -24,8 +24,22 @@ VALID_CAPTION_POSITIONS = ("lower", "center", "upper")
 VALID_CAPTION_COLORS = ("white", "yellow", "brand")
 VALID_TITLE_POSITIONS = ("top", "bottom")
 
-# legacy ids from the original two-voice spec still resolve
-_LEGACY_VOICES = {"male": "male", "female": "female", "neutral": "rachel"}
+# legacy ids still resolve: original two-voice spec ("male"/"female") plus
+# every key retired across catalog rebuilds. Targets are always current keys.
+_LEGACY_VOICES = {
+    "male": "daniel",
+    "female": "sarah",
+    "neutral": "river",
+    "anton": "antoni",
+    "arnold": "eric",
+    "chris": "roger",
+    "josh": "adam",
+    "emily": "lily",
+    "rachel": "lily",
+    "charlotte": "alice",
+    "gigi": "jessica",
+    "jessie": "jessica",
+}
 
 
 def _clamp_int(s: dict, key: str, default: int, lo: int, hi: int) -> int:
@@ -56,7 +70,7 @@ def _sanitize_settings(s: dict) -> dict:
     out = {}
     voice = s.get("voice")
     voice = _LEGACY_VOICES.get(voice, voice)
-    out["voice"] = voice if voice in VOICE_CATALOG else "male"
+    out["voice"] = voice if voice in VOICE_CATALOG else "daniel"
     provider = s.get("tts_provider")
     out["tts_provider"] = provider if provider in VALID_TTS_PROVIDERS else "auto"
     try:

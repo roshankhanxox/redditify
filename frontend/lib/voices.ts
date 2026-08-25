@@ -1,15 +1,26 @@
-// Mirrors backend/services/tts.py VOICE_CATALOG
+// Mirrors backend/services/tts.py VOICE_CATALOG — only IDs verified as
+// HTTP 200 on the configured ElevenLabs key (off-plan voices 402 at render)
 export const VOICES: { id: string; label: string; group: string }[] = [
-  { id: "male", label: "Daniel · Deep Storyteller", group: "Male" },
-  { id: "adam", label: "Adam · Warm Narrator", group: "Male" },
-  { id: "josh", label: "Josh · Energetic Male", group: "Male" },
-  { id: "brian", label: "Brian · Casual Male", group: "Male" },
-  { id: "george", label: "George · British Narrator", group: "Male" },
-  { id: "female", label: "Sarah · Friendly Female", group: "Female" },
-  { id: "rachel", label: "Rachel · Calm Female", group: "Female" },
-  { id: "emily", label: "Emily · Bright Female", group: "Female" },
-  { id: "charlotte", label: "Charlotte · Posh Female", group: "Female" },
-  { id: "gigi", label: "Gigi · Sassy Female", group: "Female" },
+  { id: "brian", label: "Brian · Resonant American", group: "Male" },
+  { id: "charlie", label: "Charlie · Energetic Australian", group: "Male" },
+  { id: "daniel", label: "Daniel · British Broadcast", group: "Male" },
+  { id: "george", label: "George · Warm British Storyteller", group: "Male" },
+  { id: "eric", label: "Eric · Smooth Conversational", group: "Male" },
+  { id: "liam", label: "Liam · Young & Energetic", group: "Male" },
+  { id: "roger", label: "Roger · Laid-back American", group: "Male" },
+  { id: "callum", label: "Callum · Dark & Gravelly", group: "Male" },
+  { id: "harry", label: "Harry · Animated & Intense", group: "Male" },
+  { id: "bill", label: "Bill · Warm Documentarian", group: "Male" },
+  { id: "adam", label: "Adam · Deep All-Rounder", group: "Male" },
+  { id: "will", label: "Will · Casual Podcast", group: "Male" },
+  { id: "antoni", label: "Antoni · Smooth Articulate", group: "Male" },
+  { id: "alice", label: "Alice · Friendly British", group: "Female" },
+  { id: "jessica", label: "Jessica · Playful & Trendy", group: "Female" },
+  { id: "laura", label: "Laura · Sunny & Quirky", group: "Female" },
+  { id: "lily", label: "Lily · Velvety British", group: "Female" },
+  { id: "matilda", label: "Matilda · Professional Alto", group: "Female" },
+  { id: "sarah", label: "Sarah · Confident & Warm", group: "Female" },
+  { id: "river", label: "River · Relaxed Androgynous", group: "Neutral" },
 ];
 
 export const TTS_PROVIDERS = [
