@@ -95,6 +95,8 @@ export interface UserBackground {
 
 export interface UserBackgroundList {
   items: UserBackground[];
+  /** Plan-dependent ready-clip cap (mirrors backend FREE/PREMIUM_MAX_BACKGROUNDS). */
+  max_backgrounds?: number;
 }
 
 export interface AdminJob extends Job {
