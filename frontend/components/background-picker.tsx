@@ -96,7 +96,7 @@ export function UserBackgroundPanel({ value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
       {busy && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[13px] text-muted-foreground">
           {phase === "uploading"
             ? `Uploading footage... ${Math.round(progress * 100)}%`
             : phase === "processing"
@@ -121,7 +121,7 @@ export function UserBackgroundPanel({ value, onChange }: Props) {
         </Select>
       ) : (
         !busy && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[13px] text-muted-foreground">
             No footage yet — upload a vertical clip (30 s to 10 min).
           </p>
         )
@@ -131,7 +131,7 @@ export function UserBackgroundPanel({ value, onChange }: Props) {
         .filter((b) => b.status === "failed")
         .slice(0, 2)
         .map((b) => (
-          <p key={b.id} className="truncate text-xs text-destructive" title={b.error_message ?? ""}>
+          <p key={b.id} className="truncate text-[13px] text-destructive" title={b.error_message ?? ""}>
             {b.label}: {b.error_message}
           </p>
         ))}

@@ -53,7 +53,7 @@ export function Hero({ signedIn }: { signedIn: boolean }) {
       </div>
 
       <section className="mx-auto flex w-full max-w-6xl flex-col items-center px-6 text-center">
-        <h1 className="max-w-5xl text-[clamp(2.5rem,6vw,5rem)] leading-[1.05] font-medium tracking-tighter text-balance">
+        <h1 className="font-heading max-w-5xl text-[clamp(2.5rem,6vw,5rem)] leading-[1.05] font-semibold tracking-tight text-balance">
           <span data-hero-line className="block">
             Paste a story.
           </span>
@@ -106,7 +106,7 @@ export function Hero({ signedIn }: { signedIn: boolean }) {
               decoding="async"
               className="absolute inset-0 h-full w-full object-cover brightness-[0.55] grayscale contrast-125 transition-transform duration-700 ease-out group-hover:scale-105"
             />
-            <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 font-mono text-[10px] tracking-widest text-white/70 uppercase">
+            <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 font-mono text-xs tracking-widest text-white/70 uppercase">
               <span>00:14</span>
               <span className="flex items-center gap-1.5">
                 <span className="size-1.5 rounded-full bg-brand" />
@@ -127,13 +127,13 @@ export function Hero({ signedIn }: { signedIn: boolean }) {
               <div className="h-full w-2/3 bg-brand" />
             </div>
             <div className="relative flex h-full flex-col justify-between p-6 text-left">
-              <p className="font-mono text-[10px] tracking-widest text-muted-foreground uppercase">
+              <p className="font-mono text-xs tracking-widest text-muted-foreground uppercase">
                 r/confessions
               </p>
               <p className="text-lg leading-snug font-semibold tracking-tight">
                 I secretly paid off my parents&rsquo; mortgage before their anniversary
               </p>
-              <p className="text-[11px] text-muted-foreground">title card · minimal</p>
+              <p className="text-xs text-muted-foreground">title card · minimal</p>
             </div>
           </div>
 

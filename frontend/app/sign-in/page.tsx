@@ -61,7 +61,9 @@ function SignInForm() {
           <Link href="/" className="text-lg font-bold">
             Reel<span className="text-primary">Bot</span>
           </Link>
-          <CardTitle className="text-xl">Sign in to your account</CardTitle>
+          <CardTitle className="font-heading text-2xl font-semibold tracking-tight">
+            Sign in to your account
+          </CardTitle>
           <CardDescription>Turn Reddit posts into vertical videos</CardDescription>
         </CardHeader>
         <CardContent>

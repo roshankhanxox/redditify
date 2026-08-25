@@ -12,7 +12,7 @@ export function FooterCta({ signedIn }: { signedIn: boolean }) {
           <div className="bg-noise absolute inset-0 opacity-[0.04]" />
         </div>
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-6 text-center">
-          <h2 className="max-w-5xl text-[clamp(3rem,8vw,7rem)] leading-[1.02] font-medium tracking-tighter text-balance">
+          <h2 className="font-heading max-w-5xl text-[clamp(3rem,8vw,7rem)] leading-[1.02] font-semibold tracking-tight text-balance">
             Make your first reel.
           </h2>
           <Link

@@ -42,7 +42,7 @@ export function AppNav() {
         </div>
         <div className="flex items-center gap-3">
           {session?.user?.email && (
-            <span className="hidden max-w-[200px] truncate text-xs text-muted-foreground md:block">
+            <span className="hidden max-w-[200px] truncate text-[13px] text-muted-foreground md:block">
               {session.user.email}
             </span>
           )}

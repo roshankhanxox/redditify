@@ -95,7 +95,7 @@ export function Pipeline({ signedIn }: { signedIn: boolean }) {
     <div ref={root} id="pipeline" className="scroll-mt-24 py-32 md:py-48">
       <section className="mx-auto grid w-full max-w-6xl gap-16 px-6 lg:grid-cols-2 lg:gap-24">
         <div data-pipeline-left className="lg:self-start">
-          <h2 className="text-4xl font-medium tracking-tighter text-balance md:text-5xl">
+          <h2 className="font-heading text-4xl font-semibold tracking-tight text-balance md:text-5xl">
             From paste to post, hands-free.
           </h2>
           <ScrubCopy />
@@ -111,12 +111,12 @@ export function Pipeline({ signedIn }: { signedIn: boolean }) {
         <ol className="flex flex-col">
           {steps.map((step, i) => (
             <li key={step.name} className="border-t border-white/8 py-10 first:border-t-0 lg:first:pt-0">
-              <p className="font-mono text-xs tracking-widest text-brand">0{i + 1}</p>
-              <h3 className="mt-3 text-xl font-semibold tracking-tight">{step.name}</h3>
+              <p className="font-mono text-[13px] tabular-nums tracking-widest text-brand">0{i + 1}</p>
+              <h3 className="mt-3 font-heading text-xl font-semibold tracking-tight">{step.name}</h3>
               <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                 {step.detail}
               </p>
-              <p className="mt-3 font-mono text-[11px] tracking-wider text-muted-foreground/70 uppercase">
+              <p className="mt-3 font-mono text-xs tracking-wider text-muted-foreground/70 uppercase">
                 {step.tech}
               </p>
             </li>

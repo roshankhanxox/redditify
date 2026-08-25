@@ -20,7 +20,7 @@ export function Pricing() {
     <section id="pricing" className="scroll-mt-24 py-32 md:py-48">
       <div className="mx-auto w-full max-w-4xl px-6">
         <div className="mb-14 text-center">
-          <h2 className="text-4xl font-medium tracking-tighter text-balance md:text-5xl">
+          <h2 className="font-heading text-4xl font-semibold tracking-tight text-balance md:text-5xl">
             Simple pricing.
           </h2>
           <p className="mx-auto mt-4 max-w-md text-sm text-balance text-muted-foreground">
@@ -48,7 +48,7 @@ export function Pricing() {
           <div className="flex flex-col rounded-2xl border border-white/8 bg-card/60 p-8">
             <p className="text-sm font-medium">
               Admin
-              <span className="ml-3 rounded-full border border-white/10 px-2.5 py-0.5 text-[11px] text-muted-foreground">
+              <span className="ml-3 rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-muted-foreground">
                 invite only
               </span>
             </p>

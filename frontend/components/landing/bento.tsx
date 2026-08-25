@@ -53,7 +53,7 @@ export function Bento() {
     <div ref={root} id="features" className="scroll-mt-24 py-32 md:py-48">
       <section className="mx-auto w-full max-w-6xl px-6">
         <div className="mb-14 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <h2 className="max-w-xl text-4xl font-medium tracking-tighter text-balance md:text-5xl">
+          <h2 className="font-heading max-w-xl text-4xl font-semibold tracking-tight text-balance md:text-5xl">
             Everything between paste and post.
           </h2>
           <p className="max-w-sm text-sm leading-relaxed text-muted-foreground md:text-right">
@@ -172,14 +172,14 @@ export function Bento() {
                   <span
                     className={
                       i === statuses.length - 1
-                        ? "rounded-full bg-brand/15 px-2.5 py-1 font-mono text-[10px] tracking-wider text-brand uppercase"
-                        : "rounded-full border border-white/10 px-2.5 py-1 font-mono text-[10px] tracking-wider text-muted-foreground uppercase"
+                        ? "rounded-full bg-brand/15 px-2.5 py-1 font-mono text-xs tracking-wider text-brand uppercase"
+                        : "rounded-full border border-white/10 px-2.5 py-1 font-mono text-xs tracking-wider text-muted-foreground uppercase"
                     }
                   >
                     {s}
                   </span>
                   {i < statuses.length - 1 && (
-                    <span aria-hidden className="text-[10px] text-muted-foreground">→</span>
+                    <span aria-hidden className="text-xs text-muted-foreground">→</span>
                   )}
                 </span>
               ))}

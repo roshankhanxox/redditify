@@ -51,7 +51,9 @@ export default function ChangePasswordPage() {
     <main className="flex min-h-screen items-center justify-center px-6">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl">Change your password</CardTitle>
+          <CardTitle className="font-heading text-2xl font-semibold tracking-tight">
+            Change your password
+          </CardTitle>
           <CardDescription>
             You must set a new password before continuing
           </CardDescription>

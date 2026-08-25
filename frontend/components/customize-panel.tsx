@@ -58,7 +58,7 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "cursor-pointer rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+            "cursor-pointer rounded-md px-2 py-1.5 text-[13px] font-medium transition-colors",
             value === o.value
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
@@ -173,7 +173,7 @@ export function CustomizePanel({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <Label className="text-muted-foreground">Font size</Label>
-              <span className="text-sm text-muted-foreground">{value.caption_font_size}px</span>
+              <span className="text-[13px] tabular-nums text-muted-foreground">{value.caption_font_size}px</span>
             </div>
             <Slider
               min={48}
@@ -222,7 +222,7 @@ export function CustomizePanel({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <Label className="text-muted-foreground">Outline</Label>
-              <span className="text-sm text-muted-foreground">{value.caption_outline}</span>
+              <span className="text-[13px] tabular-nums text-muted-foreground">{value.caption_outline}</span>
             </div>
             <Slider
               min={0}
@@ -274,7 +274,7 @@ export function CustomizePanel({
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <Label className="text-muted-foreground">Card size</Label>
-              <span className="text-sm text-muted-foreground">{value.title_scale}%</span>
+              <span className="text-[13px] tabular-nums text-muted-foreground">{value.title_scale}%</span>
             </div>
             <Slider
               min={60}

@@ -65,7 +65,9 @@ export default function SignUpPage() {
           <Link href="/" className="text-lg font-bold">
             Reel<span className="text-primary">Bot</span>
           </Link>
-          <CardTitle className="text-xl">Create your account</CardTitle>
+          <CardTitle className="font-heading text-2xl font-semibold tracking-tight">
+            Create your account
+          </CardTitle>
           <CardDescription>Free tier: 3 videos a day</CardDescription>
         </CardHeader>
         <CardContent>

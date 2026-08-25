@@ -131,7 +131,7 @@ export default function DashboardPage() {
       <AppNav />
       <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">Create a Reel</h1>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">Create a Reel</h1>
           <Badge variant="secondary">
             {quota
               ? quota.unlimited
@@ -170,7 +170,7 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="story">Story / post content</Label>
-                <span className="text-xs text-muted-foreground">{wordCount} words</span>
+                  <span className="text-[13px] tabular-nums text-muted-foreground">{wordCount} words</span>
               </div>
               <Textarea
                 id="story"
@@ -229,7 +229,7 @@ export default function DashboardPage() {
                       <SelectContent>
                         {["Male", "Female", "Neutral"].map((group) => (
                           <div key={group}>
-                            <p className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                            <p className="px-2 py-1 text-[13px] font-medium text-muted-foreground">
                               {group}
                             </p>
                             {VOICES.filter((v) => v.group === group).map((v) => (
@@ -338,7 +338,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <Label>Keep the finished file?</Label>
                   {!canRetain && (
-                    <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                    <Badge variant="outline" className="text-xs uppercase tracking-wide">
                       premium
                     </Badge>
                   )}
@@ -439,7 +439,7 @@ function JobStatusTracker({ jobId, onReset }: { jobId: string; onReset: () => vo
       <CardContent className="flex flex-col gap-3 p-6">
         <Progress value={pct} />
         <p className="text-sm text-muted-foreground text-center">{STATUS_LABELS[status]}</p>
-        <p className="text-xs text-muted-foreground text-center">{pct}%</p>
+        <p className="text-[13px] tabular-nums text-muted-foreground text-center">{pct}%</p>
       </CardContent>
     </Card>
   );

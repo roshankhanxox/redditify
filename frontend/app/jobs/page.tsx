@@ -88,12 +88,12 @@ export default function JobsPage() {
       <AppNav />
       <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">My Jobs</h1>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">My Jobs</h1>
         </header>
 
       {!data ? null : data.items.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed border-border py-24 text-center">
-          <p className="text-muted-foreground">You haven&rsquo;t generated any reels yet.</p>
+          <p className="text-base text-muted-foreground">You haven&rsquo;t generated any reels yet.</p>
           <Button asChild>
             <Link href="/dashboard">Create your first reel</Link>
           </Button>
@@ -130,10 +130,10 @@ export default function JobsPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="tabular-nums">
                       {j.duration_seconds ? `${Math.round(j.duration_seconds)}s` : "—"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="text-[13px] tabular-nums text-muted-foreground">
                       {new Date(j.created_at).toLocaleString()}
                     </TableCell>
                     <TableCell className="space-x-2 text-right">
