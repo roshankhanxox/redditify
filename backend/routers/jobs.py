@@ -224,8 +224,10 @@ async def get_job(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Detail payload — includes the full story (regenerate-from-settings
+    prefill); the list endpoint keeps excerpt-only bodies."""
     job = await _get_job_checked(job_id, user, db)
-    return job_to_dict(job)
+    return job_to_dict(job) | {"story": job.post_body}
 
 
 @router.delete("/jobs/{job_id}")
@@ -274,23 +276,28 @@ async def job_thumbnail(
 @router.get("/jobs/{job_id}/download")
 async def download_job(
     job_id: uuid.UUID,
+    inline: bool = False,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Final MP4. inline=true streams/renders in-place for the detail-sheet
+    player (no attachment disposition; S3 mode 302s to a disposition-free
+    presigned URL); the default forces a download with a safe filename."""
     job = await _get_job_checked(job_id, user, db)
     if job.status != "DONE" or not job.result_url:
         raise HTTPException(409, detail="Job has no downloadable result")
     safe_title = "".join(c for c in job.post_title[:40] if c.isalnum() or c in (" ", "-")).strip() or "reel"
     if settings.STORAGE_BACKEND == "s3":
-        # Presigned URL minted only after the ownership check above; forces
-        # attachment disposition so nothing renders inline or sniffs content types.
-        url = presign_get(
-            job.result_url,
-            settings.DOWNLOAD_SIGNED_TTL_SECONDS,
-            filename=f"{safe_title}.mp4",
-        )
+        filename = None if inline else f"{safe_title}.mp4"
+        url = presign_get(job.result_url, settings.DOWNLOAD_SIGNED_TTL_SECONDS, filename=filename)
+        if inline:
+            from fastapi.responses import RedirectResponse
+
+            return RedirectResponse(url)
         return {"url": url, "expires_in": settings.DOWNLOAD_SIGNED_TTL_SECONDS}
     path = resolve(job.result_url)
     if path is None:
         raise HTTPException(410, detail="Result file is gone")
+    if inline:
+        return FileResponse(path, media_type="video/mp4")
     return FileResponse(path, media_type="video/mp4", filename=f"{safe_title}.mp4")

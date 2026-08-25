@@ -35,6 +35,8 @@ export interface Job {
   id: string;
   title: string;
   story_excerpt: string;
+  /** Full body — only present on the single-job detail endpoint. */
+  story?: string;
   status: string;
   settings: Record<string, unknown>;
   retention: string;

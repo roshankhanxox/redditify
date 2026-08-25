@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +47,9 @@ export default async function CreateTemplatePage({
 
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-      <StoryWizard />
+      <Suspense fallback={null}>
+        <StoryWizard />
+      </Suspense>
     </div>
   );
 }
