@@ -130,15 +130,25 @@ def thumbnail_key_for(job: Job) -> str:
     return f"users/{job.user_id}/thumbs/{job.id}.jpg"
 
 
+def preview_key_for(job: Job) -> str:
+    return f"users/{job.user_id}/previews/{job.id}.mp4"
+
+
+def _media_urls(j: Job) -> tuple[str | None, str | None]:
+    """(thumbnail_url, preview_url) for a finished job. Thumbnails exist only
+    for reels rendered after V2 Phase 2; clients fall back gracefully."""
+    if j.status != "DONE" or not j.result_url:
+        return None, None
+    if settings.STORAGE_BACKEND == "s3":
+        return (
+            presign_get(thumbnail_key_for(j), 300),
+            presign_get(preview_key_for(j), 300),
+        )
+    return f"/jobs/{j.id}/thumbnail", f"/jobs/{j.id}/preview"
+
+
 def job_to_dict(j: Job) -> dict:
-    # Thumbnails exist only for reels rendered after V2 Phase 2; clients fall
-    # back to a skeleton when the URL 404s, so no existence check here.
-    thumb_url = None
-    if j.status == "DONE" and j.result_url:
-        if settings.STORAGE_BACKEND == "s3":
-            thumb_url = presign_get(thumbnail_key_for(j), 300)
-        else:
-            thumb_url = f"/jobs/{j.id}/thumbnail"
+    thumb_url, preview_url = _media_urls(j)
     return {
         "id": str(j.id),
         "title": j.post_title,
@@ -148,6 +158,7 @@ def job_to_dict(j: Job) -> dict:
         "retention": getattr(j, "retention", None) or "ephemeral",
         "result_url": j.result_url,
         "thumbnail_url": thumb_url,
+        "preview_url": preview_url,
         "result_expires_at": j.result_expires_at.isoformat() if j.result_expires_at else None,
         "error_message": j.error_message,
         "duration_seconds": j.duration_seconds,
@@ -258,6 +269,7 @@ async def delete_job(
         from services.storage import delete as storage_delete
         storage_delete(job.result_url)
         storage_delete(thumbnail_key_for(job))
+        storage_delete(preview_key_for(job))
     await db.delete(job)
     await db.commit()
     return {"deleted": True}
@@ -285,6 +297,29 @@ async def job_thumbnail(
     if path is None:
         raise HTTPException(404, detail="Thumbnail not found")
     return FileResponse(path, media_type="image/jpeg")
+
+
+@router.get("/jobs/{job_id}/preview")
+async def job_preview(
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """360x640 silent hover-preview rendition (local mode streams; S3 302s)."""
+    job = await _get_job_checked(job_id, user, db)
+    if job.status != "DONE" or not job.result_url:
+        raise HTTPException(409, detail="Job has no preview")
+    key = preview_key_for(job)
+    if settings.STORAGE_BACKEND == "s3":
+        from fastapi.responses import RedirectResponse
+
+        return RedirectResponse(presign_get(key, 300))
+    from services.storage import resolve
+
+    path = resolve(key)
+    if path is None:
+        raise HTTPException(404, detail="Preview not found")
+    return FileResponse(path, media_type="video/mp4")
 
 
 @router.get("/jobs/{job_id}/download")

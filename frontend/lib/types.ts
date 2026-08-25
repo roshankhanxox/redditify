@@ -42,6 +42,7 @@ export interface Job {
   retention: string;
   result_url: string | null;
   thumbnail_url: string | null;
+  preview_url: string | null;
   result_expires_at: string | null;
   error_message: string | null;
   duration_seconds: number | null;
