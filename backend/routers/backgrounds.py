@@ -65,7 +65,14 @@ async def list_backgrounds(
             .order_by(UserBackground.created_at.desc())
         )
     ).all()
-    return {"items": [_to_dict(bg) for bg in rows]}
+    plan = getattr(user, "plan", "free") or "free"
+    premium = user.role == "admin" or plan == "premium"
+    return {
+        "items": [_to_dict(bg) for bg in rows],
+        "max_backgrounds": (
+            settings.PREMIUM_MAX_BACKGROUNDS if premium else settings.FREE_MAX_BACKGROUNDS
+        ),
+    }
 
 
 @router.get("/backgrounds/{bg_id}")

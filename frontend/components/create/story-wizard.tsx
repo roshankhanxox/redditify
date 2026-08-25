@@ -122,6 +122,18 @@ export function StoryWizard() {
       .catch(() => toast.error("Couldn't load that reel's settings"));
   }, [searchParams, reset, router]);
 
+  // Library handoff: /dashboard/create/story?bg=<id> pre-selects user footage.
+  const bgApplied = useRef(false);
+  const bgParam = searchParams.get("bg");
+  useEffect(() => {
+    if (bgApplied.current || !bgParam || restoredOnce.current) return;
+    bgApplied.current = true;
+    setValue("gameplay_source", "user", { shouldDirty: true });
+    setValue("background_id", bgParam, { shouldDirty: true });
+    toast.info("Footage selected for your reel");
+    router.replace("/dashboard/create/story");
+  }, [bgParam, setValue, router]);
+
   useEffect(() => {
     if (restoredOnce.current) return;
     restoredOnce.current = true;
