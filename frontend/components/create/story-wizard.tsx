@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { toast } from "sonner";
 import {
@@ -28,6 +28,7 @@ import {
   clearDraft,
   loadDraft,
   saveDraft,
+  stateFromJob,
   wizardSchema,
   type WizardInput,
   type WizardState,
@@ -100,6 +101,27 @@ export function StoryWizard() {
 
   // Draft restore (after hydration so SSR markup stays stable)
   const restoredOnce = useRef(false);
+
+  // Regenerate prefill takes precedence over any saved draft.
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (restoredOnce.current) return;
+    const from = searchParams.get("from");
+    if (!from) return;
+    restoredOnce.current = true;
+    api
+      .get(`/jobs/${from}`)
+      .then(({ data }) => {
+        reset(stateFromJob(data));
+        clearDraft("story");
+        toast.info(
+          `Settings loaded from "${(data.title || "untitled reel").slice(0, 60)}"`,
+        );
+        router.replace("/dashboard/create/story");
+      })
+      .catch(() => toast.error("Couldn't load that reel's settings"));
+  }, [searchParams, reset, router]);
+
   useEffect(() => {
     if (restoredOnce.current) return;
     restoredOnce.current = true;

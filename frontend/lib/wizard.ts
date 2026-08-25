@@ -196,3 +196,53 @@ export function clearDraft(template: string): void {
     /* ignore */
   }
 }
+
+// ------------------------------------------------------------ regenerate prefill
+
+/** Map a stored job (`GET /jobs/{id}` payload) back into wizard state.
+ *  Every settings field re-validates against the schema bounds; anything
+ *  missing or out-of-range falls back to defaults. */
+export function stateFromJob(job: {
+  title?: string | null;
+  story?: string | null;
+  settings?: Record<string, unknown> | null;
+}): WizardState {
+  const st = job.settings ?? {};
+  const num = (v: unknown, def: number, lo: number, hi: number) =>
+    typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : def;
+  const bool = (v: unknown, def: boolean) => (typeof v === "boolean" ? v : def);
+  const pick = <T extends string | number>(v: unknown, allowed: readonly T[], def: T): T =>
+    allowed.includes(v as T) ? (v as T) : def;
+
+  return {
+    title: (job.title ?? "").slice(0, 300),
+    subreddit:
+      typeof st.subreddit_label === "string" ? st.subreddit_label.slice(0, 50) : "",
+    story: job.story ?? "",
+    max_words: num(st.max_words, DURATIONS[2].words, 50, 2000),
+    tts_provider: pick(st.tts_provider, ["auto", "elevenlabs", "edge"] as const, "auto"),
+    voice: typeof st.voice === "string" ? st.voice : DEFAULT_WIZARD_STATE.voice,
+    speed: num(st.speed, 1.1, 0.8, 1.5),
+    expressiveness: pick(
+      st.expressiveness,
+      ["natural", "expressive", "dramatic"] as const,
+      "expressive",
+    ),
+    gameplay_category:
+      typeof st.gameplay_category === "string" ? st.gameplay_category : "any",
+    gameplay_source: pick(st.gameplay_source, ["library", "user"] as const, "library"),
+    background_id: typeof st.background_id === "string" ? st.background_id : "",
+    retention: pick(st.retention, ["ephemeral", "retain"] as const, "ephemeral"),
+    captions_enabled: bool(st.captions_enabled, true),
+    caption_font_size: num(st.caption_font_size, 96, 48, 140),
+    caption_position: pick(st.caption_position, ["lower", "center", "upper"] as const, "lower"),
+    caption_color: pick(st.caption_color, ["white", "yellow", "brand"] as const, "white"),
+    caption_outline: num(st.caption_outline, 6, 0, 12),
+    caption_words: pick(st.caption_words, [1, 2, 3] as const, 2),
+    title_enabled: bool(st.title_enabled, true),
+    title_position: pick(st.title_position, ["top", "bottom"] as const, "top"),
+    title_scale: num(st.title_scale, 100, 60, 130),
+    title_style: pick(st.title_style, ["dark", "light", "minimal"] as const, "dark"),
+    title_badge: bool(st.title_badge, true),
+  };
+}
