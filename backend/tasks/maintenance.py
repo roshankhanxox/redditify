@@ -47,6 +47,7 @@ def reap_expired_reels():
         for job_id, key, user_id in rows:
             storage.delete(key)
             storage.delete(f"users/{user_id}/thumbs/{job_id}.jpg")
+            storage.delete(f"users/{user_id}/previews/{job_id}.mp4")
         # Flush deletes first; if storage.delete raised we never reach here.
         db.execute(
             update(Job)
@@ -129,7 +130,7 @@ def sweep_orphan_objects():
     for page in paginator.paginate(Bucket=settings.S3_BUCKET, Prefix="users/"):
         for obj in page.get("Contents", []):
             k = obj["Key"]
-            if "/reels/" in k or "/thumbs/" in k:
+            if "/reels/" in k or "/thumbs/" in k or "/previews/" in k:
                 keys.add(k)
     if not keys:
         return 0
@@ -141,6 +142,7 @@ def sweep_orphan_objects():
         ).all()
     live = {f"users/{user_id}/reels/{job_id}.mp4" for user_id, job_id in rows}
     live |= {f"users/{user_id}/thumbs/{job_id}.jpg" for user_id, job_id in rows}
+    live |= {f"users/{user_id}/previews/{job_id}.mp4" for user_id, job_id in rows}
     orphans = sorted(keys - live)
     for key in orphans:
         print(f"[orphan-sweep] deleting unreferenced object: {key}")

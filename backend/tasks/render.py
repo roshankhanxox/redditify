@@ -163,8 +163,8 @@ def generate_reel(self, job_id: str):
         set_status("UPLOADING")
         result_key = storage.upload(output_path, f"users/{user_id}/reels/{job_id}.mp4")
 
-        # Poster frame for dashboard cards. Best-effort by design: a missing
-        # thumbnail must never fail an otherwise finished reel.
+        # Poster frame + low-res hover-preview rendition. Best-effort by
+        # design: neither may fail an otherwise finished reel.
         try:
             thumb_local = os.path.join(tmp, "thumb.jpg")
             video.extract_thumbnail(
@@ -173,6 +173,12 @@ def generate_reel(self, job_id: str):
             storage.upload(thumb_local, f"users/{user_id}/thumbs/{job_id}.jpg")
         except Exception as exc:
             print(f"[render] thumbnail extraction failed for {job_id}: {exc}")
+        try:
+            preview_local = os.path.join(tmp, "preview.mp4")
+            video.render_preview(output_path, preview_local)
+            storage.upload(preview_local, f"users/{user_id}/previews/{job_id}.mp4")
+        except Exception as exc:
+            print(f"[render] preview rendition failed for {job_id}: {exc}")
 
         # Retention clock starts when the file is durably stored. The server
         # owns the clock; clients only ever receive the timestamp.
