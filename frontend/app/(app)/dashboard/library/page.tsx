@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { toast } from "sonner";
@@ -64,8 +64,10 @@ function StatusBadge({ status }: { status: UserBackground["status"] }) {
   );
 }
 
-/** Hover-to-preview card. Presigned preview URLs are fetched lazily per clip
- *  and cached for the session; failures just disable the hover preview. */
+/** Portrait card mirroring the clip's real 1080x1920 shape. A single
+ *  persistent <video> shows its first frame via preload="metadata" (acts as
+ *  the poster) and simply plays/pauses on hover — no element swapping, so
+ *  cards never resize. Preview URLs are presigned lazily per card. */
 function BackgroundCard({
   bg,
   onDelete,
@@ -73,48 +75,60 @@ function BackgroundCard({
   bg: UserBackground;
   onDelete: (bg: UserBackground) => void;
 }) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [hovered, setHovered] = useState(false);
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  const loadPreview = useCallback(async () => {
-    if (previewUrl || bg.status !== "ready") return;
-    try {
-      const r = await api.get<{ url: string }>(`/backgrounds/${bg.id}/preview-url`);
-      setPreviewUrl(r.data.url);
-    } catch {
-      /* preview unavailable — card stays static */
-    }
-  }, [previewUrl, bg.id, bg.status]);
+  useEffect(() => {
+    if (bg.status !== "ready") return;
+    let alive = true;
+    api
+      .get<{ url: string }>(`/backgrounds/${bg.id}/preview-url`)
+      .then((r) => alive && setSrc(r.data.url))
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [bg.id, bg.status]);
 
   return (
     <Card className="group overflow-hidden pt-0">
       <div
-        className="relative aspect-video w-full bg-muted"
-        onMouseEnter={() => {
-          setHovered(true);
-          void loadPreview();
+        className="relative aspect-[9/16] w-full overflow-hidden bg-zinc-900"
+        onMouseEnter={() => void videoRef.current?.play()}
+        onMouseLeave={() => {
+          const v = videoRef.current;
+          if (v) {
+            v.pause();
+            v.currentTime = 0;
+          }
         }}
-        onMouseLeave={() => setHovered(false)}
       >
-        {previewUrl && hovered ? (
+        {bg.status === "ready" && src ? (
           <video
-            src={previewUrl}
-            autoPlay
+            ref={videoRef}
+            src={src}
             muted
             loop
             playsInline
-            onError={() => setPreviewUrl(null)}
-            className="size-full object-cover"
+            preload="metadata"
+            onError={() => setFailed(true)}
+            className="absolute inset-0 size-full object-cover"
           />
         ) : (
           <div className="flex size-full items-center justify-center text-muted-foreground/40">
-            {bg.status === "ready" ? (
-              <Play className="size-6 opacity-0 transition-opacity group-hover:opacity-100" />
-            ) : (
+            {bg.status === "failed" ? (
               <ImageIcon className="size-5" />
+            ) : bg.status === "ready" && failed ? (
+              <span className="text-xs">Preview unavailable</span>
+            ) : (
+              <Loader2 className="size-5 animate-spin" />
             )}
           </div>
         )}
+        <div className="absolute left-2 top-2">
+          <StatusBadge status={bg.status} />
+        </div>
       </div>
       <CardContent className="flex flex-col gap-2 p-3">
         <div className="flex items-start justify-between gap-2">
@@ -141,12 +155,9 @@ function BackgroundCard({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge status={bg.status} />
-          <span className="text-[13px] tabular-nums text-muted-foreground">
-            {bg.duration_seconds ? `${Math.round(bg.duration_seconds)}s` : "—"} ·{" "}
-            {bg.resolution ?? "—"} · {fmtSize(bg.file_size_bytes)}
-          </span>
+        <div className="text-[13px] tabular-nums text-muted-foreground">
+          {bg.duration_seconds ? `${Math.round(bg.duration_seconds)}s` : "—"} ·{" "}
+          {bg.resolution ?? "—"} · {fmtSize(bg.file_size_bytes)}
         </div>
         {bg.status === "failed" && bg.error_message && (
           <p className="line-clamp-2 text-[13px] text-destructive" title={bg.error_message}>
@@ -307,7 +318,7 @@ export default function LibraryPage() {
               </EmptyHeader>
             </Empty>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {items.map((bg) => (
                 <BackgroundCard key={bg.id} bg={bg} onDelete={setDeleteTarget} />
               ))}
