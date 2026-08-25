@@ -97,7 +97,7 @@ def _sanitize_layers(s: dict) -> dict:
             texts.append({
                 "text": text,
                 "font_id": font_id,
-                "size": _clamp_int(t, "size", 96, 24, 220),
+                "scale": _clamp_float(t, "scale", 0.5, 0.05, 0.95),
                 "color": color.lower() if color_re.match(color) else "#ffffff",
                 "align": align,
                 "x": _clamp_float(t, "x", 0.5, 0.0, 1.0),

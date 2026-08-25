@@ -23,8 +23,8 @@ def _hex_to_rgba(color: str, alpha: int = 255) -> tuple[int, int, int, int]:
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), alpha
 
 
-def _fit_font(text: str, font_id: str, size_px: int) -> ImageFont.FreeTypeFont:
-    """Load the registered font, shrinking until one line fits MAX_WIDTH.
+def _fit_font(text: str, font_id: str, size_px: int, max_w: int = MAX_WIDTH) -> ImageFont.FreeTypeFont:
+    """Load the registered font, shrinking until one line fits max_w.
     Explicit \n breaks are honored; there is no automatic wrapping."""
     path = get_font_path(font_id)
     size = max(12, int(size_px))
@@ -40,22 +40,31 @@ def _fit_font(text: str, font_id: str, size_px: int) -> ImageFont.FreeTypeFont:
             font.getbbox(line)[2] - font.getbbox(line)[0]
             for line in text.split("\n") or [text]
         )
-        if widest <= MAX_WIDTH:
+        if widest <= max_w:
             return font
-        size = int(size * MAX_WIDTH / widest)
+        size = int(size * max_w / widest)
 
 
 def render_text_overlay(spec: dict, out_path: str | None = None) -> str:
-    """spec: {text, font_id, size, color, align} → transparent PNG path.
+    """spec: {text, font_id, scale|size, color, align} → transparent PNG path.
 
+    scale is the editor's frame-width fraction; font px follows the same
+    3.4cqw factor the browser preview uses (scale * 36.72px @1080w), and the
+    canvas is capped to the scaled box so nothing overflows the frame.
     Deterministic for identical specs (golden-tested)."""
     text = str(spec.get("text", "")).replace("\r\n", "\n").strip("\n")
     font_id = spec.get("font_id", "anton")
-    size = max(24, min(220, int(spec.get("size", 96))))
+    if "size" in spec:
+        size = max(24, min(220, int(spec["size"])))
+        max_w = MAX_WIDTH
+    else:
+        scale = min(0.95, max(0.05, float(spec.get("scale", 0.5))))
+        size = max(24, min(220, round(scale * 1080 * 0.034)))
+        max_w = max(120, min(MAX_WIDTH, round(scale * 1080)))
     color = _hex_to_rgba(spec.get("color", "#ffffff"))
     align = spec.get("align", "center")
 
-    font = _fit_font(text or " ", font_id, size)
+    font = _fit_font(text or " ", font_id, size, max_w)
     lines = text.split("\n") or [" "]
     line_heights = []
     widths = []
