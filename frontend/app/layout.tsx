@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -14,6 +14,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Display face for headings only (page/section titles) — see the type-scale
+// contract in globals.css.
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-display",
+  subsets: ["latin"],
+  axes: ["opsz", "wdth"],
+});
+
 export const metadata: Metadata = {
   title: "ReelBot — Reddit to Reels",
   description:
@@ -24,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full scroll-smooth antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${bricolage.variable} dark h-full scroll-smooth antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <SessionProvider>{children}</SessionProvider>
