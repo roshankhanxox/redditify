@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { toast } from "sonner";
 import type { JobList } from "@/lib/types";
@@ -62,6 +63,17 @@ const STATUS_VARIANT: Record<string, "secondary" | "default" | "destructive" | "
 
 export default function JobsPage() {
   const [page, setPage] = useState(1);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Arriving from the wizard with ?highlight=<jobId> — surface once, clean URL.
+  useEffect(() => {
+    if (searchParams.get("highlight")) {
+      toast.info("Rendering started — track progress below");
+      router.replace("/dashboard/reels");
+    }
+  }, [searchParams, router]);
+
   const { data, mutate } = useSWR<JobList>(`/jobs?page=${page}&per_page=10`, fetcher, {
     refreshInterval: (latest) =>
       latest?.items.some((j) => !["DONE", "FAILED"].includes(j.status)) ? 4000 : 0,
