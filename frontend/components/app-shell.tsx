@@ -33,6 +33,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -109,17 +110,18 @@ export function AppShell({
 
   return (
     <TooltipProvider>
-      <SidebarProvider defaultOpen={defaultOpen}>
+      <SidebarProvider
+        defaultOpen={defaultOpen}
+        style={{ "--sidebar-width-icon": "3.5rem" } as React.CSSProperties}
+      >
         <Sidebar collapsible="icon">
-          <SidebarHeader>
-            <div className="flex items-center justify-between gap-2 px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-              <BrandMark className="group-data-[collapsible=icon]:hidden" />
-              <span className="hidden font-heading text-lg font-semibold text-brand group-data-[collapsible=icon]:inline">
-                R
-              </span>
-              <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
-            </div>
-          </SidebarHeader>
+        <SidebarHeader>
+          {/* Collapsed: single centered trigger; expanded: brand + trigger */}
+          <div className="flex items-center justify-between gap-2 px-2 py-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:justify-center">
+            <BrandMark className="group-data-[collapsible=icon]:hidden" />
+            <SidebarTrigger />
+          </div>
+        </SidebarHeader>
           <SidebarContent>
             <NavSection label="Create" items={CREATE_GROUP} />
             <NavSection label="Workspace" items={WORKSPACE_GROUP} />
@@ -163,9 +165,10 @@ export function AppShell({
                   </DropdownMenuContent>
                 </DropdownMenu>
               </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarFooter>
-        </Sidebar>
+          </SidebarMenu>
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
         <SidebarInset>
           <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur md:hidden">
             <SidebarTrigger />
