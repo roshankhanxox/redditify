@@ -43,6 +43,8 @@ VOICE_CATALOG: dict[str, dict] = {
     "sarah":    {"label": "Sarah · Confident & Warm",         "el": "EXAVITQu4vr4xnSDxMaL", "edge": "en-US-JennyNeural"},
     # --- Neutral ---
     "river":    {"label": "River · Relaxed Androgynous",      "el": "SAz9YHcvj6GT2YYXdXww", "edge": "en-US-EmmaNeural"},
+    # --- Meme ---
+    "ana":      {"label": "Ana · Kid Voice",                  "el": "cgSgspJ2msm6clMCkdW9", "edge": "en-US-AnaNeural"},
 }
 
 VALID_TTS_PROVIDERS = ("auto", "elevenlabs", "edge")
@@ -178,3 +180,35 @@ def generate_voiceover(
     except Exception as e:
         logger.warning(f"ElevenLabs failed ({e}), falling back to edge-tts")
         return asyncio.run(_edge(text, voice, output_path, speed, expressiveness))
+
+
+def probe_sample_rate(path: str) -> int:
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a:0",
+         "-show_entries", "stream=sample_rate",
+         "-of", "default=noprint_wrappers=1:nokey=1", path],
+        capture_output=True, text=True,
+    )
+    return int(result.stdout.strip() or 44100)
+
+
+def pitch_filter(semitones: float, sample_rate: int) -> str:
+    """asetrate raises pitch and shortens the clip; atempo compensates so
+    duration (and therefore subtitle sync) is preserved."""
+    ratio = 2.0 ** (semitones / 12.0)
+    new_sr = max(1, int(round(sample_rate * ratio)))
+    return f"asetrate={new_sr},aresample={sample_rate},atempo={1 / ratio:.6f}"
+
+
+def apply_pitch(src: str, dst: str, semitones: float) -> str:
+    """Post-Whisper audio stage: shift pitch while preserving duration.
+    Call AFTER transcription so word-synced subtitles match the original."""
+    if abs(semitones) < 1e-3:
+        return src
+    sr = probe_sample_rate(src)
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-i", src,
+         "-af", pitch_filter(semitones, sr), "-c:a", "libmp3lame", "-q:a", "2", dst],
+        check=True,
+    )
+    return dst

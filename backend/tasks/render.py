@@ -79,6 +79,7 @@ def generate_reel(self, job_id: str):
         subreddit_label = cfg.get("subreddit_label") or "reelbot"
         captions_on = bool(cfg.get("captions_enabled", True))
         title_on = bool(cfg.get("title_enabled", True))
+        template = cfg.get("template", "story")
 
         # Resume fast-path: on a retry, restore whatever artifacts survived in
         # scratch and skip those stages. Anything missing regenerates normally.
@@ -121,18 +122,42 @@ def generate_reel(self, job_id: str):
             )
             storage.upload(card_path, _scratch_key(job_id, "title.png"), keep_local=True)
 
-        set_status("PICKING_GAMEPLAY")
-        clip_path = assets.pick_clip_for_job_sync(user_id, cfg)
+        if template == "meme":
+            # Meme composite: procedural/animated scene background instead of
+            # gameplay. Pitch is applied AFTER transcription so the word-synced
+            # subtitles above still match the unshifted audio timeline.
+            from services import scenes as scenes_service
 
-        set_status("COMPOSITING_VIDEO")
-        output_path = video.render_video(
-            clip_path,
-            voice_path,
-            os.path.join(tmp, "output.mp4"),
-            card=card_path if title_on else None,
-            subs=srt_path if captions_on else None,
-            card_pos=cfg.get("title_position", "top"),
-        )
+            scene = scenes_service.get_scene(cfg.get("scene_id")) or scenes_service.SCENES[0]
+            pitch = float(cfg.get("tts_pitch") or 0)
+            voice_for_render = voice_path
+            if abs(pitch) >= 0.01:
+                set_status("PICKING_GAMEPLAY")  # closest existing stage label
+                voice_for_render = tts.apply_pitch(
+                    voice_path, os.path.join(tmp, "voice-pitched.mp3"), pitch
+                )
+
+            set_status("COMPOSITING_VIDEO")
+            output_path = video.render_meme_video(
+                scene,
+                voice_for_render,
+                os.path.join(tmp, "output.mp4"),
+                subs=srt_path if captions_on else None,
+                tmp_dir=tmp,
+            )
+        else:
+            set_status("PICKING_GAMEPLAY")
+            clip_path = assets.pick_clip_for_job_sync(user_id, cfg)
+
+            set_status("COMPOSITING_VIDEO")
+            output_path = video.render_video(
+                clip_path,
+                voice_path,
+                os.path.join(tmp, "output.mp4"),
+                card=card_path if title_on else None,
+                subs=srt_path if captions_on else None,
+                card_pos=cfg.get("title_position", "top"),
+            )
         duration = video.get_duration(output_path)
 
         set_status("UPLOADING")
