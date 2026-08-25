@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
 from db import get_db
+from models import User
 from models import UserBackground
 from security import get_current_user
 from services.storage import (
