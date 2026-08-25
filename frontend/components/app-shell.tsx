@@ -96,14 +96,20 @@ function NavSection({ label, items }: { label: string; items: NavItem[] }) {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  defaultOpen = true,
+}: {
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === "admin";
   const email = session?.user?.email ?? "";
 
   return (
     <TooltipProvider>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={defaultOpen}>
         <Sidebar collapsible="icon">
           <SidebarHeader>
             <div className="flex items-center justify-between gap-2 px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
