@@ -1,6 +1,6 @@
 # Plan: Dashboard V2 — Platform Shell, Typography Overhaul & Reel Templates
 
-Status: Draft — not started
+Status: Phase 0 implemented — in review on `feature/v2-phase-0-foundations` (awaiting manual UI sign-off before merge)
 Scope: frontend (full app shell + all authed pages), backend (stats, thumbnails, templates)
 Depends on: nothing — builds directly on merged PR #3 (render customizations + voice catalog)
 
