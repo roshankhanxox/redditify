@@ -61,6 +61,7 @@ class UserBackground(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")  # pending|processing|ready|failed
+    kind: Mapped[str] = mapped_column(Text, nullable=False, default="video")  # video|image|character
     label: Mapped[str] = mapped_column(Text, nullable=False, default="")
     upload_id: Mapped[str | None] = mapped_column(Text)  # S3 multipart upload id while pending
     source_key: Mapped[str] = mapped_column(Text, nullable=False, default="")  # original upload (kept for re-transcodes)

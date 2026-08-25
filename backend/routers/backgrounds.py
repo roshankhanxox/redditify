@@ -1,4 +1,5 @@
 import math
+import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -43,6 +44,7 @@ def _to_dict(bg: UserBackground) -> dict:
     # Object keys are deliberately excluded — they are internal storage paths.
     return {
         "id": str(bg.id),
+        "kind": bg.kind,
         "label": bg.label,
         "status": bg.status,
         "duration_seconds": bg.duration_seconds,
@@ -55,15 +57,15 @@ def _to_dict(bg: UserBackground) -> dict:
 
 @router.get("/backgrounds")
 async def list_backgrounds(
+    kind: str | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    q = select(UserBackground).where(UserBackground.user_id == user.id)
+    if kind in ("video", "image", "character"):
+        q = q.where(UserBackground.kind == kind)
     rows = (
-        await db.scalars(
-            select(UserBackground)
-            .where(UserBackground.user_id == user.id)
-            .order_by(UserBackground.created_at.desc())
-        )
+        await db.scalars(q.order_by(UserBackground.created_at.desc()))
     ).all()
     plan = getattr(user, "plan", "free") or "free"
     premium = user.role == "admin" or plan == "premium"
@@ -142,6 +144,7 @@ async def init_background(
     ]
     return {
         "id": str(bg.id),
+        "kind": bg.kind,
         "label": bg.label,
         "status": bg.status,
         "part_size": PART_SIZE_BYTES,
@@ -218,3 +221,99 @@ async def delete_background(
     await db.delete(bg)
     await db.commit()
     return {"deleted": True}
+
+# ------------------------------------------------------------------ images
+
+ALLOWED_IMAGE_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+MAX_IMAGE_UPLOAD_MB = 15
+
+
+class ImageInit(BaseModel):
+    label: str = Field(default="", max_length=80)
+    size_bytes: int = Field(gt=0)
+    content_type: str
+    kind: str = Field(default="image")  # image | character
+
+
+@router.post("/backgrounds/image-init")
+async def init_image(
+    body: ImageInit,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Single-PUT flow for PNG/JPEG/WebP uploads (memes' characters/images).
+    Presigned PUT — bytes never pass through the API."""
+    content_type = body.content_type.split(";")[0].strip().lower()
+    ext = ALLOWED_IMAGE_TYPES.get(content_type)
+    if ext is None:
+        raise HTTPException(422, detail="content_type must be PNG, JPEG or WebP")
+    if body.size_bytes > MAX_IMAGE_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(422, detail=f"File too large (max {MAX_IMAGE_UPLOAD_MB} MB)")
+    if body.kind not in ("image", "character"):
+        raise HTTPException(422, detail="kind must be image or character")
+
+    bg_id = uuid.uuid4()
+    base_dir = f"users/{user.id}/assets/{bg_id}"
+    bg = UserBackground(
+        id=bg_id,
+        user_id=user.id,
+        status="pending",
+        kind=body.kind,
+        label=_sanitize_label(body.label),
+        source_key=f"{base_dir}/source{ext}",
+    )
+    db.add(bg)
+    await db.commit()
+    url = presign_put(bg.source_key, 900, content_type)
+    return {"id": str(bg_id), "url": url}
+
+
+@router.post("/backgrounds/{bg_id}/image-complete")
+async def complete_image(
+    bg_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Validate decode, downscale to <=2048px preserving alpha, re-encode WebP,
+    mark ready. Sync on purpose — a few hundred ms, no worker round-trip."""
+    import asyncio
+
+    return await asyncio.to_thread(_complete_image_sync, bg_id, user, db)
+
+
+def _complete_image_sync(bg_id: uuid.UUID, user: User, db) -> dict:
+    from PIL import Image
+
+    bg = db.get(UserBackground, bg_id)
+    if bg is None or bg.user_id != user.id:
+        raise HTTPException(403, detail="Not your upload")
+    if bg.status != "pending":
+        raise HTTPException(409, detail="Upload already finalized")
+    src = storage.resolve(bg.source_key)
+    if src is None:
+        raise HTTPException(404, detail="Upload not found — PUT did not complete")
+
+    import tempfile
+
+    with Image.open(src) as im:
+        im.load()
+        if getattr(im, "is_animated", False):
+            raise HTTPException(422, detail="Animated images are not supported")
+        has_alpha = im.mode in ("RGBA", "LA") or "transparency" in im.info
+        im = im.convert("RGBA" if has_alpha else "RGB")
+        if max(im.size) > 2048:
+            im.thumbnail((2048, 2048), Image.LANCZOS)
+
+        base_dir = bg.source_key.rsplit("/", 1)[0]
+        clip_key = f"{base_dir}/asset.webp"
+        out = os.path.join(tempfile.mkdtemp(dir=tempfile.gettempdir()), "asset.webp")
+        im.save(out, "WEBP", lossless=has_alpha, quality=90)
+
+    storage.upload(out, clip_key)
+    with Image.open(storage.resolve(clip_key)) as final_im:
+        bg.clip_key = clip_key
+        bg.resolution = f"{final_im.width}x{final_im.height}"
+    bg.status = "ready"
+    bg.file_size_bytes = os.path.getsize(storage.resolve(clip_key))
+    db.commit()
+    return _to_dict(bg)

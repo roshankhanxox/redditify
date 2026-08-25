@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -9,13 +9,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Plus,
   RotateCcw,
   Sparkles,
 } from "lucide-react";
 import { useForm, type UseFormSetValue, type UseFormWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { api } from "@/lib/api";
+import { api, uploadCharacter } from "@/lib/api";
+import type { CharacterAssetList } from "@/lib/types";
+import { LayerEditor } from "@/components/create/layer-editor";
 import { UserBackgroundPanel } from "@/components/background-picker";
 import type { AssetList } from "@/lib/types";
 import { VOICES, TTS_PROVIDERS } from "@/lib/voices";
@@ -42,6 +45,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CustomizePanel, Segmented } from "@/components/customize-panel";
@@ -647,51 +651,200 @@ const SCENE_LABELS: Record<string, string> = {
   forest: "Mint Forest",
 };
 
-function MemeLookStep({
-  watch,
-  setValue,
-  error,
+function ScenePicker({
+  selected,
+  onSelect,
 }: {
-  watch: UseFormWatch<WizardInput>;
-  setValue: UseFormSetValue<WizardInput>;
-  error?: string;
+  selected: string;
+  onSelect: (id: string) => void;
 }) {
   const { data: scenes } = useSWR<{ id: string; label: string; kind: string }[]>(
     "/scenes",
     fetcher,
   );
-  const selected = watch("scene_id");
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {(scenes ?? []).map((sc) => (
+        <button
+          key={sc.id}
+          type="button"
+          onClick={() => onSelect(sc.id)}
+          aria-pressed={selected === sc.id}
+          className={cn(
+            "flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border p-1.5 transition-colors",
+            selected === sc.id ? "border-brand ring-1 ring-brand" : "hover:border-ring",
+          )}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/api/proxy/scenes/${sc.id}/preview`}
+            alt=""
+            loading="lazy"
+            className="aspect-[9/16] w-full rounded-md object-cover"
+          />
+          <span className="pb-0.5 text-[13px] font-medium">{sc.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const DEFAULT_CHAR_SPOTS = [
+  { x: 0.5, y: 0.62 },
+  { x: 0.28, y: 0.68 },
+  { x: 0.72, y: 0.68 },
+];
+
+function CharacterPicker({
+  selectedIds,
+  onToggle,
+}: {
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+}) {
+  const { data, mutate } = useSWR<CharacterAssetList>("/characters", fetcher);
+  const items = data?.items.filter((a) => a.status === "ready") ?? [];
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [phase, setPhase] = useState<"idle" | "working">("idle");
+  const [bgRemoved, setBgRemoved] = useState(true);
+
+  async function upload(file: File | undefined | null) {
+    if (!file || phase === "working") return;
+    setPhase("working");
+    try {
+      const asset = await uploadCharacter(file, { bgRemoved });
+      if (asset.status !== "ready") throw new Error(asset.error_message || "Processing failed");
+      toast.success(bgRemoved && asset.bg_removed ? "Character cut out" : "Image ready");
+      await mutate();
+      onToggle(asset.id);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setPhase("idle");
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => void upload(e.target.files?.[0])}
+        disabled={phase === "working"}
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" variant="outline" size="sm" disabled={phase === "working"} onClick={() => inputRef.current?.click()}>
+          {phase === "working" ? <Loader2 className="animate-spin" /> : <Plus />}
+          Upload character
+        </Button>
+        <label className="flex cursor-pointer items-center gap-1.5 text-[13px] text-muted-foreground">
+          <Switch checked={bgRemoved} onCheckedChange={setBgRemoved} />
+          Remove background
+        </label>
+        {items.length > 0 && (
+          <span className="text-[13px] text-muted-foreground">
+            tap to place / remove · max 3
+          </span>
+        )}
+      </div>
+
+      {items.length > 0 && (
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+          {items.map((a) => {
+            const idx = selectedIds.indexOf(a.id);
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => onToggle(a.id)}
+                aria-pressed={idx >= 0}
+                className={cn(
+                  "relative aspect-square cursor-pointer overflow-hidden rounded-lg border bg-muted p-0 transition-all",
+                  idx >= 0 ? "border-brand ring-1 ring-brand" : "hover:border-ring",
+                  !a.bg_removed && "after:absolute after:inset-0 after:bg-white/60 after:content-['']",
+                )}
+                title={!a.bg_removed ? "Original image (no cutout)" : a.label}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/proxy/characters/${a.id}/file`}
+                  alt=""
+                  loading="lazy"
+                  className="size-full object-contain"
+                />
+                {idx >= 0 && (
+                  <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white">
+                    {idx + 1}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MemeLookStep({
+  watch,
+  setValue,
+}: {
+  watch: UseFormWatch<WizardInput>;
+  setValue: UseFormSetValue<WizardInput>;
+}) {
+  const sceneId = watch("scene_id");
   const pitch = watch("tts_pitch");
+  const characters = watch("characters") ?? [];
+  const texts = watch("text_overlays") ?? [];
+
+  function toggleCharacter(id: string) {
+    const idx = characters.findIndex((c) => c.asset_id === id);
+    if (idx >= 0) {
+      setValue(
+        "characters",
+        characters.filter((_, k) => k !== idx),
+        { shouldDirty: true },
+      );
+      return;
+    }
+    if (characters.length >= 3) {
+      toast.error("Up to 3 characters per reel");
+      return;
+    }
+    const spot = DEFAULT_CHAR_SPOTS[characters.length % DEFAULT_CHAR_SPOTS.length];
+    setValue(
+      "characters",
+      [...characters, { asset_id: id, ...spot, scale: 0.35, flip: false, bob: true }],
+      { shouldDirty: true },
+    );
+  }
 
   return (
     <>
       <Row label="Scene">
-        <div className="grid grid-cols-3 gap-3">
-          {(scenes ?? []).map((sc) => (
-            <button
-              key={sc.id}
-              type="button"
-              onClick={() => setValue("scene_id", sc.id, { shouldDirty: true })}
-              aria-pressed={selected === sc.id}
-              className={cn(
-                "flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border p-1.5 transition-colors",
-                selected === sc.id
-                  ? "border-brand ring-1 ring-brand"
-                  : "hover:border-ring",
-              )}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/api/proxy/scenes/${sc.id}/preview`}
-                alt=""
-                loading="lazy"
-                className="aspect-[9/16] w-full rounded-md object-cover"
-              />
-              <span className="pb-0.5 text-[13px] font-medium">{sc.label}</span>
-            </button>
-          ))}
-        </div>
-        <FieldError msg={error} />
+        <ScenePicker selected={sceneId} onSelect={(id) => setValue("scene_id", id, { shouldDirty: true })} />
+        <FieldError msg={undefined} />
+      </Row>
+
+      <Row label="Characters">
+        <CharacterPicker
+          selectedIds={characters.map((c) => c.asset_id)}
+          onToggle={toggleCharacter}
+        />
+      </Row>
+
+      <Row label="Arrange layers">
+        <LayerEditor
+          sceneId={sceneId}
+          characters={characters}
+          texts={texts}
+          onCharactersChange={(next) => setValue("characters", next, { shouldDirty: true })}
+          onTextsChange={(next) => setValue("text_overlays", next, { shouldDirty: true })}
+        />
       </Row>
 
       <Row

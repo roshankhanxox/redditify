@@ -94,6 +94,22 @@ export interface UserBackground {
   created_at: string;
 }
 
+export interface CharacterAssetList {
+  items: CharacterAsset[];
+}
+
+export interface CharacterAsset {
+  id: string;
+  label: string;
+  status: "pending" | "ready" | "failed";
+  width: number | null;
+  height: number | null;
+  file_size_bytes: number | null;
+  bg_removed: boolean;
+  error_message: string | null;
+  created_at: string;
+}
+
 export interface UserBackgroundList {
   items: UserBackground[];
   /** Plan-dependent ready-clip cap (mirrors backend FREE/PREMIUM_MAX_BACKGROUNDS). */
