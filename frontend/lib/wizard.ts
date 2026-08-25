@@ -18,8 +18,8 @@ export const TEMPLATES = [
   {
     id: "meme",
     name: "Meme Studio",
-    tagline: "Rainbow scenes, character cutouts, draggable text and child TTS.",
-    status: "coming-soon" as const,
+    tagline: "Gradient scenes, pitched kid-voice TTS and synced captions.",
+    status: "live" as const,
   },
   {
     id: "image",
@@ -51,6 +51,7 @@ const renderSchema = z.object({
 
 export const wizardSchema = z
   .object({
+    template: z.enum(["story", "meme", "image"]),
     // Content
     title: z.string().trim().min(1, "Give your reel a title").max(300),
     subreddit: z.string().trim().max(50).default(""),
@@ -61,7 +62,9 @@ export const wizardSchema = z
     voice: z.string().min(1),
     speed: z.number().min(0.8).max(1.5),
     expressiveness: z.enum(["natural", "expressive", "dramatic"]),
-    // Look — background
+    tts_pitch: z.number().int().min(-12).max(12),
+    scene_id: z.string(),
+    // Look — background (story template)
     gameplay_category: z.string(),
     gameplay_source: z.enum(["library", "user"]),
     background_id: z.string().default(""),
@@ -70,11 +73,22 @@ export const wizardSchema = z
     ...renderSchema.shape,
   })
   .superRefine((v, ctx) => {
-    if (v.gameplay_source === "user" && !v.background_id) {
+    if (
+      v.template === "story" &&
+      v.gameplay_source === "user" &&
+      !v.background_id
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["background_id"],
         message: "Pick or upload your own footage first",
+      });
+    }
+    if (v.template === "meme" && !v.scene_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scene_id"],
+        message: "Pick a scene",
       });
     }
   });
@@ -84,6 +98,7 @@ export type WizardState = z.infer<typeof wizardSchema>;
 export type WizardInput = z.input<typeof wizardSchema>;
 
 export const DEFAULT_WIZARD_STATE: WizardState = {
+  template: "story",
   title: "",
   subreddit: "",
   story: "",
@@ -92,11 +107,22 @@ export const DEFAULT_WIZARD_STATE: WizardState = {
   voice: "daniel",
   speed: 1.1,
   expressiveness: "expressive",
+  tts_pitch: 0,
+  scene_id: "rainbow",
   gameplay_category: "any",
   gameplay_source: "library",
   background_id: "",
   retention: "ephemeral",
   ...DEFAULT_RENDER_SETTINGS,
+};
+
+/** Meme defaults: captions carry the text, so the title card starts off. */
+export const DEFAULT_MEME_STATE: WizardState = {
+  ...DEFAULT_WIZARD_STATE,
+  template: "meme",
+  voice: "ana",
+  tts_pitch: 5,
+  title_enabled: false,
 };
 
 export const STEPS = [
@@ -109,11 +135,12 @@ export const STEPS = [
 /** Fields validated when leaving each step (zod paths). */
 export const STEP_FIELDS: Record<(typeof STEPS)[number]["id"], string[]> = {
   content: ["title", "story"],
-  voice: ["tts_provider", "voice", "speed", "expressiveness"],
+  voice: ["tts_provider", "voice", "speed", "expressiveness", "tts_pitch"],
   look: [
     "gameplay_category",
     "gameplay_source",
     "background_id",
+    "scene_id",
     "retention",
     "captions_enabled",
     "caption_font_size",
@@ -145,24 +172,31 @@ export function buildPayload(s: WizardState) {
     title_style: s.title_style,
     title_badge: s.title_badge,
   };
+  const base = {
+    voice: s.voice,
+    tts_provider: s.tts_provider,
+    speed: s.speed,
+    expressiveness: s.expressiveness,
+    ...render,
+    retention: s.retention,
+    max_words: s.max_words,
+  };
   return {
     title: s.title.trim(),
     subreddit: s.subreddit.trim() || null,
     story: s.story.trim(),
-    settings: {
-      voice: s.voice,
-      tts_provider: s.tts_provider,
-      speed: s.speed,
-      expressiveness: s.expressiveness,
-      ...render,
-      gameplay_category: s.gameplay_category,
-      gameplay_source: s.gameplay_source,
-      ...(s.gameplay_source === "user"
-        ? { background_id: s.background_id }
-        : {}),
-      retention: s.retention,
-      max_words: s.max_words,
-    },
+    settings:
+      s.template === "meme"
+        ? { template: "meme", scene_id: s.scene_id, tts_pitch: s.tts_pitch, ...base }
+        : {
+            template: "story",
+            gameplay_category: s.gameplay_category,
+            gameplay_source: s.gameplay_source,
+            ...(s.gameplay_source === "user"
+              ? { background_id: s.background_id }
+              : {}),
+            ...base,
+          },
   };
 }
 
@@ -214,7 +248,12 @@ export function stateFromJob(job: {
   const pick = <T extends string | number>(v: unknown, allowed: readonly T[], def: T): T =>
     allowed.includes(v as T) ? (v as T) : def;
 
+  const template = pick(st.template, ["story", "meme", "image"] as const, "story");
   return {
+    template,
+    scene_id:
+      typeof st.scene_id === "string" && st.scene_id ? st.scene_id : DEFAULT_WIZARD_STATE.scene_id,
+    tts_pitch: num(st.tts_pitch, 0, -12, 12),
     title: (job.title ?? "").slice(0, 300),
     subreddit:
       typeof st.subreddit_label === "string" ? st.subreddit_label.slice(0, 50) : "",

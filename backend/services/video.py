@@ -54,6 +54,69 @@ def render_preview(src: str, dst: str) -> str:
     return dst
 
 
+def scene_input_args(scene: dict, duration: float, tmp_dir: str) -> list[str]:
+    """FFmpeg input args producing a 1080x1920 background stream for a scene.
+    Static/generated scenes render to a PNG looped for the clip duration;
+    animated gradients come straight from ffmpeg's native gradients source."""
+    kind, p = scene["kind"], scene["params"]
+    if kind == "animated_gradient":
+        colors = "".join(
+            f":c{i}=0x{c.lstrip('#')}" for i, c in enumerate(p["colors"][:8])
+        )
+        src = (
+            f"gradients=s=1080x1920:r=30:nb_colors={len(p['colors'][:8])}"
+            f":speed={p.get('speed', 0.03)}{colors}"
+        )
+        return ["-f", "lavfi", "-t", f"{duration + 0.5:.3f}", "-i", src]
+    from services.scenes import render_scene_still
+
+    out_png = os.path.join(tmp_dir, f"scene-{scene['id']}.png")
+    render_scene_still(scene, out_png, size=(1080, 1920))
+    return ["-loop", "1", "-t", f"{duration + 0.5:.3f}", "-i", out_png]
+
+
+def render_meme_video(
+    scene: dict,
+    audio_path: str,
+    output_path: str,
+    subs: str | None = None,
+    tmp_dir: str = "/tmp/reelbot",
+) -> str:
+    """Meme-template composite: procedural/animated scene background + voiceover
+    (+ burned-in captions). Same styling contract as render_video — the .ass
+    file owns all caption styling at PlayRes 1080x1920."""
+    duration = get_duration(audio_path)
+
+    inputs = scene_input_args(scene, duration, tmp_dir)
+    # The voiceover becomes the input directly after the scene's single -i.
+    audio_idx = inputs.count("-i")
+    inputs += ["-i", audio_path]
+
+    if subs:
+        sub_path = subs.replace("\\", "/").replace(":", "\\:")
+        chain = (
+            "[0:v]scale=1080:1920,setsar=1[bg];"
+            f"[bg]subtitles='{sub_path}'[vout]"
+        )
+    else:
+        chain = "[0:v]scale=1080:1920,setsar=1[vout]"
+
+    run_ffmpeg([
+        *inputs,
+        "-filter_complex", chain,
+        "-map", "[vout]",
+        "-map", f"{audio_idx}:a",
+        "-t", f"{duration + 0.5:.3f}",
+        "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+        "-c:a", "aac", "-b:a", "192k",
+        "-r", "30",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        output_path,
+    ])
+    return output_path
+
+
 def extract_thumbnail(src: str, dst: str, at_seconds: float = 1.0) -> str:
     """Poster frame for dashboard cards: 270x480 JPG grabbed near at_seconds."""
     run_ffmpeg([

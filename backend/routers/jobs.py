@@ -14,6 +14,7 @@ from services.jobs import find_active_job
 from services.quota import check_quota, increment_quota
 from services.storage import presign_get, resolve
 from services.tts import VOICE_CATALOG, VALID_EXPRESSIVENESS, VALID_TTS_PROVIDERS
+from services.scenes import DEFAULT_SCENE_ID, get_scene
 from tasks.render import generate_reel
 
 router = APIRouter(tags=["jobs"])
@@ -23,6 +24,7 @@ VALID_CATEGORIES = ("any", "minecraft", "subway_surfers", "satisfying", "other")
 VALID_CAPTION_POSITIONS = ("lower", "center", "upper")
 VALID_CAPTION_COLORS = ("white", "yellow", "brand")
 VALID_TITLE_POSITIONS = ("top", "bottom")
+VALID_TEMPLATES = ("story", "meme", "image")
 
 # legacy ids still resolve: original two-voice spec ("male"/"female") plus
 # every key retired across catalog rebuilds. Targets are always current keys.
@@ -87,6 +89,18 @@ def _sanitize_settings(s: dict) -> dict:
     out["retention"] = retention if retention in ("ephemeral", "retain") else "ephemeral"
     expressiveness = s.get("expressiveness")
     out["expressiveness"] = expressiveness if expressiveness in VALID_EXPRESSIVENESS else "expressive"
+
+    # Template dispatch — scene/pitch only meaningful for the meme template.
+    out["template"] = s.get("template") if s.get("template") in VALID_TEMPLATES else "story"
+    if out["template"] == "meme":
+        out["scene_id"] = get_scene(s.get("scene_id"))["id"] if get_scene(s.get("scene_id")) else DEFAULT_SCENE_ID
+        try:
+            out["tts_pitch"] = max(-12, min(12, int(float(s.get("tts_pitch", 0)))))
+        except (TypeError, ValueError):
+            out["tts_pitch"] = 0
+    else:
+        out["scene_id"] = ""
+        out["tts_pitch"] = 0
 
     # Render customizations — enums are whitelisted and ints clamped here so
     # nothing but known-safe values can ever reach libass/PIL/ffmpeg.
