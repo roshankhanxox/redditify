@@ -270,6 +270,7 @@ export function LayerEditor({
                 fontSize: `calc(${t.scale} * 3.4cqw)`,
                 textShadow: "0 2px 6px rgb(0 0 0 / 45%)",
                 lineHeight: 1.1,
+                whiteSpace: "nowrap",
               }}
               className={cn(
                 "absolute -translate-x-1/2 -translate-y-1/2 cursor-move whitespace-pre-wrap px-1 font-bold uppercase",
