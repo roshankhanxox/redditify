@@ -83,6 +83,10 @@ function Media({ job }: { job: Job }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [vidFailed, setVidFailed] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  // S3 mode presigns the preview key directly; if the rendition hasn't been
+  // generated yet (older reels) that URL 404s. Retry once through the
+  // authenticated route, which lazily generates the preview and 302s.
+  const [warmRetry, setWarmRetry] = useState(false);
 
   if (job.status === "FAILED") {
     return (
@@ -105,13 +109,17 @@ function Media({ job }: { job: Job }) {
     return (
       <video
         ref={videoRef}
-        src={job.preview_url}
+        src={
+          warmRetry
+            ? `/api/proxy/jobs/${job.id}/preview`
+            : (job.preview_url ?? undefined)
+        }
         poster={job.thumbnail_url ?? undefined}
         muted
         loop
         playsInline
         preload="metadata"
-        onError={() => setVidFailed(true)}
+        onError={() => (warmRetry ? setVidFailed(true) : setWarmRetry(true))}
         onMouseEnter={() => void videoRef.current?.play()}
         onMouseLeave={() => {
           const v = videoRef.current;
