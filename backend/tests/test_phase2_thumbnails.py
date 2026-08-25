@@ -92,3 +92,42 @@ class TestThumbnailKeyAndPayload:
 def test_stats_router_imports():
     # Import-time guard: bad SQL/imports in the endpoint surface here.
     from routers import stats  # noqa: F401
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
+class TestPreviewBackfill:
+    uid, jid = uuid.uuid4(), uuid.uuid4()
+
+    def test_lazy_generation_from_result(self, tmp_path, monkeypatch):
+        """Old reels without a stored preview get one generated on demand."""
+        import subprocess
+
+        from config import settings as cfg
+        from models import Job
+        from routers.jobs import _generate_preview_sync
+
+        monkeypatch.setattr(cfg, "STORAGE_BACKEND", "local")
+        monkeypatch.setattr(cfg, "LOCAL_STORAGE_PATH", str(tmp_path))
+
+        src = tmp_path / "result.mp4"
+        subprocess.run(
+            ["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+             "-i", "testsrc=size=1080x1920:rate=30:duration=1",
+             "-c:v", "libx264", "-preset", "ultrafast", str(src)],
+            check=True, capture_output=True,
+        )
+        job = Job(
+            id=self.jid, user_id=self.uid, post_title="T", post_body="B",
+            status="DONE",
+            result_url=f"users/{self.uid}/reels/{self.jid}.mp4",
+        )
+        dest = tmp_path / "users" / str(self.uid) / "reels"
+        dest.mkdir(parents=True)
+        os.replace(src, dest / f"{self.jid}.mp4")
+
+        path = _generate_preview_sync(job)
+        assert path and os.path.exists(path)
+
+        # Second call resolves straight from storage (no regeneration).
+        again = _generate_preview_sync(job)
+        assert again == path

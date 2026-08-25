@@ -299,24 +299,83 @@ async def job_thumbnail(
     return FileResponse(path, media_type="image/jpeg")
 
 
+def _generate_preview_sync(job: Job) -> str | None:
+    """Backfill the 360x640 preview rendition from the stored result MP4.
+    Used for reels rendered before previews existed; blocking by nature, so
+    callers must run it off the event loop. Returns a servable local path.
+    Only ever deletes files it created itself — never the source reel."""
+    import os
+    import tempfile
+
+    from services.storage import (
+        delete as storage_delete,
+        download as storage_download,
+        resolve,
+        upload as storage_upload,
+    )
+    from services.video import render_preview
+
+    work = os.path.join(tempfile.gettempdir(), "reelbot-backfill")
+    os.makedirs(work, exist_ok=True)
+    fetched_src: str | None = None  # temp copy we own (S3 mode only)
+    dst = os.path.join(work, f"{job.id}-preview.mp4")
+    try:
+        if settings.STORAGE_BACKEND == "s3":
+            fetched_src = os.path.join(work, f"{job.id}.mp4")
+            if storage_download(job.result_url, fetched_src) is None:
+                return None
+            source = fetched_src
+        else:
+            source = resolve(job.result_url)
+            if source is None:
+                return None
+        render_preview(source, dst)
+        storage_upload(dst, preview_key_for(job))
+        return resolve(preview_key_for(job))
+    except Exception as exc:  # noqa: BLE001 — preview must never 500 a page
+        print(f"[preview-backfill] failed for {job.id}: {exc}")
+        try:
+            storage_delete(preview_key_for(job))
+        except Exception:
+            pass
+        return None
+    finally:
+        for p in filter(None, (fetched_src, dst)):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+
+
 @router.get("/jobs/{job_id}/preview")
 async def job_preview(
     job_id: uuid.UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """360x640 silent hover-preview rendition (local mode streams; S3 302s)."""
+    """360x640 silent hover-preview rendition. Missing renditions for older
+    reels are generated lazily from the stored result on first request."""
+    from starlette.concurrency import run_in_threadpool
+
     job = await _get_job_checked(job_id, user, db)
     if job.status != "DONE" or not job.result_url:
         raise HTTPException(409, detail="Job has no preview")
     key = preview_key_for(job)
     if settings.STORAGE_BACKEND == "s3":
         from fastapi.responses import RedirectResponse
+        from services.storage import stat as storage_stat
 
+        if storage_stat(key) is None:
+            await run_in_threadpool(_generate_preview_sync, job)
+            if storage_stat(key) is None:
+                raise HTTPException(404, detail="Preview not found")
         return RedirectResponse(presign_get(key, 300))
+
     from services.storage import resolve
 
     path = resolve(key)
+    if path is None:
+        path = await run_in_threadpool(_generate_preview_sync, job)
     if path is None:
         raise HTTPException(404, detail="Preview not found")
     return FileResponse(path, media_type="video/mp4")
