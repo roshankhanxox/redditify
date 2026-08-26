@@ -28,7 +28,7 @@ _EMOJI_RE = re.compile(
 
 
 def _load_font(font_id: str | None, size: int) -> ImageFont.FreeTypeFont:
-    path = get_font_path(font_id or "") if font_id else None
+    path = get_font_path(font_id) if font_id else None
     if path:
         return ImageFont.truetype(path, size)
     return ImageFont.load_default(size)
@@ -81,10 +81,12 @@ def render_caption_png(
     fontsize: int = 96,
     color: str = "white",
     outline: int = 6,
-    font_id: str | None = None,
+    font_id: str = "anton",
 ) -> dict:
     """Whole text as one fitted multi-line transparent PNG.
-    Returns {'path', 'width', 'height'} in 1080x1920-frame pixels."""
+    Uses a REGISTERED font (default anton) so the editor's @font-face
+    preview can mirror the exact same typeface. Returns
+    {'path', 'width', 'height'} in 1080x1920-frame pixels."""
     words = text.split()
     if not words:
         raise ValueError("empty caption text")

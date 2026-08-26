@@ -288,6 +288,14 @@ class TestCaptionPng:
         out = _sanitize_settings({})
         assert out["caption_layout"] == "chunks"
 
+    def test_sanitize_caption_scale(self):
+        out = _sanitize_settings({"caption_scale": 30})
+        assert out["caption_scale"] == 50
+        out = _sanitize_settings({"caption_scale": 5000})
+        assert out["caption_scale"] == 100
+        out = _sanitize_settings({})
+        assert out["caption_scale"] == 100
+
 
 # ---------------------------------------------------------------- title card
 

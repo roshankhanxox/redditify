@@ -117,7 +117,10 @@ def generate_reel(self, job_id: str):
                 duration = video.get_duration(voice_path)
                 cap_y = float(cfg.get("caption_y", 0.65))
                 spec = {
-                    "fontsize": int(cfg.get("caption_font_size", 96)),
+                    "fontsize": round(
+                        int(cfg.get("caption_font_size", 96))
+                        * int(cfg.get("caption_scale", 100)) / 100
+                    ),
                     "color": str(cfg.get("caption_color", "white")),
                     "outline": int(cfg.get("caption_outline", 6)),
                 }

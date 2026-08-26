@@ -401,7 +401,9 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                 </>
               )}
 
-              {step === 2 && isMeme && <MemeLookStep watch={watch} setValue={setValue} />}
+              {step === 2 && isMeme && (
+                <MemeLookStep watch={watch} setValue={setValue} canRetain={canRetain ?? false} />
+              )}
 
               {step === 2 && !isMeme && (
                 <>
@@ -412,6 +414,7 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                       caption_mode: s.caption_mode,
                       caption_layout: s.caption_layout,
                       caption_font_size: s.caption_font_size,
+                      caption_scale: s.caption_scale ?? 100,
                       caption_position: s.caption_position,
                       caption_y: s.caption_y,
                       caption_color: s.caption_color,
@@ -862,9 +865,11 @@ function CharacterPicker({
 function MemeLookStep({
   watch,
   setValue,
+  canRetain,
 }: {
   watch: UseFormWatch<WizardInput>;
   setValue: UseFormSetValue<WizardInput>;
+  canRetain: boolean;
 }) {
   const sceneId = watch("scene_id");
   const sceneAnimated = watch("scene_animated");
@@ -942,6 +947,7 @@ function MemeLookStep({
             position: watch("caption_position"),
             mode: watch("caption_mode") ?? "synced",
             layout: watch("caption_layout") ?? "chunks",
+            scale: watch("caption_scale") ?? 100,
             text: watch("caption_text") ?? "",
             onChange: setCaptionsEnabled,
             onYChange: (v) =>
@@ -963,6 +969,7 @@ function MemeLookStep({
               }
             },
             onLayoutChange: (v) => setValue("caption_layout", v, { shouldDirty: true }),
+            onScaleChange: (v) => setValue("caption_scale", v, { shouldDirty: true }),
             onTextChange: (v) => setValue("caption_text", v, { shouldDirty: true }),
           }}
           onCharactersChange={(next) => setValue("characters", next, { shouldDirty: true })}
@@ -985,6 +992,28 @@ function MemeLookStep({
           Pitch up for the classic meme sound. Applied after transcription, so
           captions stay word-synced.
         </p>
+      </Row>
+
+      <Row label="Keep the finished file?">
+        <RadioGroup
+          value={watch("retention")}
+          onValueChange={(v) => setValue("retention", v as "ephemeral" | "retain", { shouldDirty: true })}
+          className="flex gap-4"
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="ephemeral" id="meme-ret-ephemeral" />
+            <Label htmlFor="meme-ret-ephemeral" className="font-normal">Auto-delete (~15 min)</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="retain" id="meme-ret-retain" disabled={!canRetain} />
+            <Label htmlFor="meme-ret-retain" className={`font-normal ${canRetain ? "" : "opacity-50"}`}>
+              Keep until I delete
+            </Label>
+            {!canRetain && (
+              <Badge variant="outline" className="text-xs uppercase tracking-wide">premium</Badge>
+            )}
+          </div>
+        </RadioGroup>
       </Row>
     </>
   );

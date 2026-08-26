@@ -50,11 +50,45 @@ export interface CaptionPreview {
   mode?: CaptionMode;
   layout?: CaptionLayout;
   text?: string;
+  scale?: number;
   onChange?: (enabled: boolean) => void;
   onYChange?: (y: number) => void;
   onModeChange?: (mode: CaptionMode) => void;
   onLayoutChange?: (layout: CaptionLayout) => void;
+  onScaleChange?: (scale: number) => void;
   onTextChange?: (text: string) => void;
+}
+
+// Mirror of services/caption_png.py fit budgets (1080x1920 frame px).
+const BLOCK_MAX_W = 980;
+const BLOCK_MAX_H = 1100;
+const LINE_BOX = 1.25;
+
+function fitBlock(text: string, baseFontsize: number): { fs: number; lines: string[] } {
+  const words = text.split(/\s+/).filter(Boolean);
+  let fs = Math.max(28, Math.min(140, baseFontsize));
+  const wrap = (cpl: number): string[] => {
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      const cand = cur ? `${cur} ${w}` : w;
+      if (cand.length <= cpl || !cur) cur = cand;
+      else {
+        lines.push(cur);
+        cur = w;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  };
+  let lines: string[] = [];
+  while (fs > 24) {
+    lines = wrap(Math.max(6, Math.floor(BLOCK_MAX_W / (fs * 0.55))));
+    if (lines.length * fs * LINE_BOX <= BLOCK_MAX_H) break;
+    fs -= 2;
+  }
+  if (fs <= 24) lines = wrap(Math.max(6, Math.floor(BLOCK_MAX_W / (24 * 0.55))));
+  return { fs, lines };
 }
 
 const TEXT_COLORS = ["#ffffff", "#000000", "#ff4500", "#ffe500", "#00e5ff"];
@@ -229,6 +263,8 @@ function CaptionGhost({
   color,
   outline,
   words,
+  layout,
+  scale,
   sample,
   draggable,
   onYChange,
@@ -239,6 +275,8 @@ function CaptionGhost({
   color: CaptionColor;
   outline: number;
   words: 1 | 2 | 3;
+  layout?: CaptionLayout;
+  scale?: number;
   sample?: string;
   draggable: boolean;
   onYChange?: (y: number) => void;
@@ -282,6 +320,15 @@ function CaptionGhost({
 
   const sizeCqw = ((fontSize / 1080) * 100).toFixed(3);
   const strokeCqw = ((outline / 1080) * 100).toFixed(3);
+
+  // Full-screen layout: mirror the backend fit exactly (same wrap, same
+  // shrink steps, same budgets) so the ghost IS the final render.
+  const isBlock = layout === "block";
+  const blockText = (sample ?? "").trim();
+  const fitted = isBlock && blockText
+    ? fitBlock(blockText, Math.round(fontSize * (scale ?? 100) / 100))
+    : null;
+
   return (
     <div
       className="absolute left-1/2 z-20 -translate-x-1/2 -translate-y-1/2"
@@ -303,17 +350,35 @@ function CaptionGhost({
         <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/65 px-1.5 py-px text-[8px] font-semibold uppercase tracking-wider text-white/75">
           captions · drag to place
         </span>
-        <span
-          className="block whitespace-nowrap text-center font-extrabold uppercase leading-tight outline outline-1 outline-dashed outline-white/35"
-          style={{
-            color: CAPTION_COLOR_HEX[color],
-            fontSize: `calc(${sizeCqw} * 1cqw)`,
-            WebkitTextStroke: `calc(${strokeCqw} * 1cqw) black`,
-            paintOrder: "stroke fill",
-          }}
-        >
-          {sample ?? CAPTION_SAMPLE.split(" ").slice(0, words).join(" ")}
-        </span>
+        {fitted ? (
+          <div
+            className="block text-center uppercase outline outline-1 outline-dashed outline-white/35"
+            style={{
+              color: CAPTION_COLOR_HEX[color],
+              fontFamily: "'anton', sans-serif",
+              fontSize: `calc(${(fitted.fs / 10.8).toFixed(3)} * 1cqw)`,
+              lineHeight: LINE_BOX,
+              WebkitTextStroke: `calc(${strokeCqw} * 1cqw) black`,
+              paintOrder: "stroke fill",
+            }}
+          >
+            {fitted.lines.map((line, i) => (
+              <div key={i}>{line}</div>
+            ))}
+          </div>
+        ) : (
+          <span
+            className="block whitespace-nowrap text-center font-extrabold uppercase leading-tight outline outline-1 outline-dashed outline-white/35"
+            style={{
+              color: CAPTION_COLOR_HEX[color],
+              fontSize: `calc(${sizeCqw} * 1cqw)`,
+              WebkitTextStroke: `calc(${strokeCqw} * 1cqw) black`,
+              paintOrder: "stroke fill",
+            }}
+          >
+            {sample ?? CAPTION_SAMPLE.split(" ").slice(0, words).join(" ")}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -766,6 +831,8 @@ export function LayerEditor({
               color={captions.color}
               outline={captions.outline}
               words={captions.words}
+              layout={captions.layout}
+              scale={captions.scale}
               sample={
                 captions.mode === "static" && (captions.text ?? "").trim()
                   ? (captions.layout ?? "chunks") === "block"
@@ -834,6 +901,22 @@ export function LayerEditor({
                       ? "Whole text on one screen — auto-wrapped & sized to fit."
                       : `Auto-split into ${captions.words}-word chunks, evenly timed.`}
                   </p>
+                  {(captions.layout ?? "chunks") === "block" && captions.onScaleChange && (
+                    <div className="flex items-center gap-3">
+                      <Label className="shrink-0 text-muted-foreground">Size</Label>
+                      <Slider
+                        min={50}
+                        max={100}
+                        step={5}
+                        value={[captions.scale ?? 100]}
+                        onValueChange={([v]) => captions.onScaleChange?.(v)}
+                        className="flex-1"
+                      />
+                      <span className="w-10 text-right text-[13px] tabular-nums text-muted-foreground">
+                        {captions.scale ?? 100}%
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </>

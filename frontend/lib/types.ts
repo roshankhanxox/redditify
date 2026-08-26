@@ -12,6 +12,8 @@ export interface RenderSettings {
   /** Static mode only: chunks (timed groups) or block (one fitted screen). */
   caption_layout: CaptionLayout;
   caption_font_size: number;
+  /** Full-screen block: percent of the auto-fit font size (50–100). */
+  caption_scale: number;
   caption_position: CaptionPosition;
   /** Normalized vertical center of the caption block [0.05..0.95]; maps to
    *  ASS MarginV = (1-y)*1920. Overrides `caption_position` at render time. */
@@ -38,6 +40,7 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   caption_mode: "synced",
   caption_layout: "chunks",
   caption_font_size: 96,
+  caption_scale: 100,
   caption_position: "lower",
   caption_y: CAPTION_POSITION_Y.lower,
   caption_color: "white",
