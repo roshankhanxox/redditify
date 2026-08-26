@@ -1,5 +1,3 @@
-import re
-
 import whisper
 
 # PlayRes is 1080x1920 (declared in chunks_to_ass); MarginV values below land
@@ -95,7 +93,7 @@ def words_to_chunks(words: list[dict], chunk_size: int = 2) -> list[dict]:
 
 
 def even_chunks(text: str, duration: float, words_per_screen: int = 2) -> list[dict]:
-    """Static-caption mode: split user text into word groups shown for equal
+    """Static-caption timing: split user text into word groups shown for equal
     slices of the voiceover duration. No transcription — pacing is uniform,
     which is exactly the trade static captions opt into."""
     words = text.split()
@@ -110,62 +108,9 @@ def even_chunks(text: str, duration: float, words_per_screen: int = 2) -> list[d
     ]
 
 
-# Full-screen block layout: uppercase glyph ≈ 0.55×fontsize wide (Arial),
-# line box ≈ 1.2×fontsize tall; keep inside 980px width / 1100px height.
-_BLOCK_MAX_W = 980
-_BLOCK_MAX_H = 1100
-
-# libass burns captions without a dependable color-emoji font — pictographs
-# come out as tofu boxes. Strip them before rendering.
-_EMOJI_RE = re.compile(
-    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF"
-    "\u2B00-\u2BFF\uFE0F\u200D\u20E3]+"
-)
-
-
-def strip_emoji(text: str) -> str:
-    return re.sub(r"\s+", " ", _EMOJI_RE.sub("", text)).strip()
-
-
-def _wrap_words(words: list[str], chars_per_line: int) -> list[str]:
-    lines: list[str] = []
-    cur = ""
-    for w in words:
-        cand = f"{cur} {w}".strip()
-        if len(cand) <= chars_per_line or not cur:
-            cur = cand
-        else:
-            lines.append(cur)
-            cur = w
-    if cur:
-        lines.append(cur)
-    return lines
-
-
-def static_block(text: str, duration: float, base_fontsize: int = 96) -> list[dict]:
-    """Whole text as ONE caption event spanning the full duration. Lines fill
-    the frame width (greedy word wrap) and the font auto-shrinks until the
-    block fits the height budget — via an inline {\\fs} override."""
-    words = strip_emoji(text).split()
-    if not words or duration <= 0:
-        return []
-
-    fs = max(28, min(140, int(base_fontsize)))
-    while fs > 24:
-        cpl = max(6, int(_BLOCK_MAX_W / (fs * 0.55)))
-        lines = _wrap_words(words, cpl)
-        if len(lines) * fs * 1.2 <= _BLOCK_MAX_H:
-            break
-        fs -= 2
-    else:
-        cpl = max(6, int(_BLOCK_MAX_W / (24 * 0.55)))
-        lines = _wrap_words(words, cpl)
-
-    return [{
-        "text": f"{{\\fs{fs}}}" + "\n".join(line.upper() for line in lines),
-        "start": 0.0,
-        "end": round(duration, 3),
-    }]
+# Static-caption block rendering (fit-to-box wrap, emoji support) lives in
+# services/caption_png.py — libass can't do color emojis, so static text is
+# composited as PNG overlays instead of burned ASS events.
 
 
 def chunks_to_srt(chunks: list[dict], path: str) -> str:

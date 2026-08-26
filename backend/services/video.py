@@ -90,10 +90,13 @@ def render_meme_video(
     characters: list[dict] | None = None,
     text_pngs: list[dict] | None = None,
     scene_animated: bool = True,
+    caption_pngs: list[dict] | None = None,
 ) -> str:
     """Meme-template composite. Layer order (z-law): scene → characters →
     text overlays → word-synced captions last. Placement is normalized
-    center-anchored {x, y}; character scale is a fraction of frame width."""
+    center-anchored {x, y}; character scale is a fraction of frame width.
+    caption_pngs are pre-rendered static captions: {path, y, start, end}
+    (y normalized frame height, start/end seconds; centered horizontally)."""
     duration = get_duration(audio_path)
 
     inputs = scene_input_args(scene, duration, tmp_dir, animated=scene_animated)
@@ -139,6 +142,21 @@ def render_meme_video(
         chain_parts.append(f"{current}overlay=x='W*{x}-w/2':y='H*{y}-h/2'[tl{i}]")
         current = f"[tl{i}]"
         inputs += ["-i", tp["path"]]
+        next_idx += 1
+
+    for i, cp in enumerate(caption_pngs or []):
+        y = cp["y"]
+        start, end = float(cp.get("start", 0.0)), float(cp.get("end", duration))
+        enable = (
+            ""
+            if start <= 0.001 and end >= duration - 0.001
+            else f":enable='between(t,{start:.3f},{end:.3f})'"
+        )
+        chain_parts.append(
+            f"{current}overlay=x='(W-w)/2':y='H*{y}-h/2'{enable}[cap{i}]"
+        )
+        current = f"[cap{i}]"
+        inputs += ["-i", cp["path"]]
         next_idx += 1
 
     if subs:
