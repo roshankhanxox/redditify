@@ -54,12 +54,18 @@ def render_preview(src: str, dst: str) -> str:
     return dst
 
 
-def scene_input_args(scene: dict, duration: float, tmp_dir: str) -> list[str]:
+def scene_input_args(
+    scene: dict,
+    duration: float,
+    tmp_dir: str,
+    animated: bool = True,
+) -> list[str]:
     """FFmpeg input args producing a 1080x1920 background stream for a scene.
-    Static/generated scenes render to a PNG looped for the clip duration;
-    animated gradients come straight from ffmpeg's native gradients source."""
+    Animated gradient scenes render to a live lavfi gradients source unless
+    `animated=False`, which pins them to a representative blended still
+    (looped PNG); static kinds always render to a still."""
     kind, p = scene["kind"], scene["params"]
-    if kind == "animated_gradient":
+    if kind == "animated_gradient" and animated:
         colors = "".join(
             f":c{i}=0x{c.lstrip('#')}" for i, c in enumerate(p["colors"][:8])
         )
@@ -83,13 +89,14 @@ def render_meme_video(
     tmp_dir: str = "/tmp/reelbot",
     characters: list[dict] | None = None,
     text_pngs: list[dict] | None = None,
+    scene_animated: bool = True,
 ) -> str:
     """Meme-template composite. Layer order (z-law): scene → characters →
     text overlays → word-synced captions last. Placement is normalized
     center-anchored {x, y}; character scale is a fraction of frame width."""
     duration = get_duration(audio_path)
 
-    inputs = scene_input_args(scene, duration, tmp_dir)
+    inputs = scene_input_args(scene, duration, tmp_dir, animated=scene_animated)
     # The voiceover becomes the input directly after the scene's single -i.
     audio_idx = inputs.count("-i")
     inputs += ["-i", audio_path]
@@ -105,6 +112,16 @@ def render_meme_video(
         transforms = f"scale={w}:-1"
         if ch.get("flip"):
             transforms += ",hflip"
+        rot = float(ch.get("rotation") or 0)
+        if abs(rot) > 0.01:
+            # Rotate about center; output frame grows so no corner is clipped
+            # and the transparent fill keeps the RGBA cutout clean. The
+            # overlay's W*x-w/2 math then centers the ROTATED bbox.
+            rad = f"{round(rot, 2)}*PI/180"
+            transforms += (
+                f",rotate={rad}:c=black@0"
+                f":ow='rotw({rad})':oh='roth({rad})'"
+            )
         bob = "+sin(t*2)*20" if ch.get("bob") else ""
         label = f"char{i}"
         out_label = f"co{i}"

@@ -76,6 +76,7 @@ def _sanitize_layers(s: dict) -> dict:
                 "scale": _clamp_float(c, "scale", 0.35, 0.05, 0.9),
                 "flip": bool(c.get("flip")),
                 "bob": bool(c.get("bob")),
+                "rotation": _clamp_float(c, "rotation", 0.0, -180.0, 180.0),
             })
 
 
@@ -97,7 +98,7 @@ def _sanitize_layers(s: dict) -> dict:
             texts.append({
                 "text": text,
                 "font_id": font_id,
-                "scale": _clamp_float(t, "scale", 0.5, 0.05, 0.95),
+                "scale": _clamp_float(t, "scale", 0.28, 0.02, 0.98),
                 "color": color.lower() if color_re.match(color) else "#ffffff",
                 "align": align,
                 "x": _clamp_float(t, "x", 0.5, 0.0, 1.0),
@@ -160,6 +161,9 @@ def _sanitize_settings(s: dict) -> dict:
             out["tts_pitch"] = max(-12, min(12, int(float(s.get("tts_pitch", 0)))))
         except (TypeError, ValueError):
             out["tts_pitch"] = 0
+        # Gradient scenes may be pinned to a single blended frame. New reels
+        # default static; jobs stored before this knob keep animated (True).
+        out["scene_animated"] = _to_bool(s.get("scene_animated"), False)
     else:
         out["scene_id"] = ""
         out["tts_pitch"] = 0
@@ -170,6 +174,14 @@ def _sanitize_settings(s: dict) -> dict:
     out["caption_font_size"] = _clamp_int(s, "caption_font_size", 96, 48, 140)
     position = s.get("caption_position")
     out["caption_position"] = position if position in VALID_CAPTION_POSITIONS else "lower"
+    # Free-drag caption placement; defaults to the position preset's height.
+    out["caption_y"] = _clamp_float(
+        s,
+        "caption_y",
+        {"lower": 0.65, "center": 0.55, "upper": 0.38}.get(out["caption_position"], 0.65),
+        0.05,
+        0.95,
+    )
     color = s.get("caption_color")
     out["caption_color"] = color if color in VALID_CAPTION_COLORS else "white"
     out["caption_outline"] = _clamp_int(s, "caption_outline", 6, 0, 12)
