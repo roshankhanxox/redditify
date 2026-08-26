@@ -45,6 +45,13 @@ VOICE_CATALOG: dict[str, dict] = {
     "river":    {"label": "River · Relaxed Androgynous",      "el": "SAz9YHcvj6GT2YYXdXww", "edge": "en-US-EmmaNeural"},
     # --- Meme ---
     "ana":      {"label": "Ana · Kid Voice",                  "el": "cgSgspJ2msm6clMCkdW9", "edge": "en-US-AnaNeural"},
+    # --- Indian · Hinglish (free engine only) ---
+    # en-IN neural voices read romanized Hindi ("TUMHE KYA PROBLEM HAI")
+    # with the desi accent intact — the deliberately 'broken' delivery.
+    # No plan-included ElevenLabs premade is verified on this key, so these
+    # are edge exclusives; premium requests route to the free engine.
+    "prabhat":  {"label": "Prabhat · Indian Hinglish",        "el": None, "edge": "en-IN-PrabhatNeural"},
+    "neerja":   {"label": "Neerja · Indian Hinglish",         "el": None, "edge": "en-IN-NeerjaNeural"},
 }
 
 VALID_TTS_PROVIDERS = ("auto", "elevenlabs", "edge")
@@ -168,7 +175,11 @@ def generate_voiceover(
     if expressiveness not in VALID_EXPRESSIVENESS:
         expressiveness = "expressive"
 
-    if provider == "edge":
+    entry = VOICE_CATALOG.get(voice, VOICE_CATALOG["daniel"])
+
+    # Voices without a verified ElevenLabs id are free-engine exclusives —
+    # never silently substitute another voice's premium render.
+    if provider == "edge" or not entry.get("el"):
         return asyncio.run(_edge(text, voice, output_path, speed, expressiveness))
 
     if provider == "elevenlabs":
