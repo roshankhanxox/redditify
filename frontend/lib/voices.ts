@@ -22,6 +22,8 @@ export const VOICES: { id: string; label: string; group: string }[] = [
   { id: "sarah", label: "Sarah · Confident & Warm", group: "Female" },
   { id: "river", label: "River · Relaxed Androgynous", group: "Neutral" },
   { id: "ana", label: "Ana · Kid Voice", group: "Kid" },
+  { id: "prabhat", label: "Prabhat · Indian Hinglish", group: "Male" },
+  { id: "neerja", label: "Neerja · Indian Hinglish", group: "Female" },
 ];
 
 export const TTS_PROVIDERS = [
