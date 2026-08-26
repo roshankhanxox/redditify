@@ -7,6 +7,9 @@ export interface RenderSettings {
   captions_enabled: boolean;
   caption_font_size: number;
   caption_position: CaptionPosition;
+  /** Normalized vertical center of the caption block [0.05..0.95]; maps to
+   *  ASS MarginV = (1-y)*1920. Overrides `caption_position` at render time. */
+  caption_y: number;
   caption_color: CaptionColor;
   caption_outline: number;
   caption_words: 1 | 2 | 3;
@@ -17,10 +20,18 @@ export interface RenderSettings {
   title_badge: boolean;
 }
 
+/** Where each legacy position preset lands vertically (fraction of frame height). */
+export const CAPTION_POSITION_Y: Record<CaptionPosition, number> = {
+  lower: 0.65,
+  center: 0.55,
+  upper: 0.38,
+};
+
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   captions_enabled: true,
   caption_font_size: 96,
   caption_position: "lower",
+  caption_y: CAPTION_POSITION_Y.lower,
   caption_color: "white",
   caption_outline: 6,
   caption_words: 2,

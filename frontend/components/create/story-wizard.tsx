@@ -356,6 +356,7 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                       captions_enabled: s.captions_enabled,
                       caption_font_size: s.caption_font_size,
                       caption_position: s.caption_position,
+                      caption_y: s.caption_y,
                       caption_color: s.caption_color,
                       caption_outline: s.caption_outline,
                       caption_words: s.caption_words,
@@ -707,6 +708,7 @@ function CharacterPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<"idle" | "working">("idle");
   const [bgRemoved, setBgRemoved] = useState(true);
+  const [dragOver, setDragOver] = useState(false);
 
   async function upload(file: File | undefined | null) {
     if (!file || phase === "working") return;
@@ -726,7 +728,24 @@ function CharacterPicker({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div
+      className={cn(
+        "flex flex-col gap-2 rounded-lg border border-dashed p-3 transition-colors",
+        dragOver ? "border-brand bg-brand/5" : "border-transparent",
+      )}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        if (phase === "working") return;
+        const file = e.dataTransfer.files?.[0];
+        if (file) void upload(file);
+      }}
+    >
       <input
         ref={inputRef}
         type="file"
@@ -750,6 +769,9 @@ function CharacterPicker({
           </span>
         )}
       </div>
+      <p className="text-[13px] text-muted-foreground">
+        Pick a file or drop a PNG/JPG here{bgRemoved ? " — the background is cut out automatically." : "."}
+      </p>
 
       {items.length > 0 && (
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
@@ -797,9 +819,14 @@ function MemeLookStep({
   setValue: UseFormSetValue<WizardInput>;
 }) {
   const sceneId = watch("scene_id");
+  const sceneAnimated = watch("scene_animated");
   const pitch = watch("tts_pitch");
   const characters = watch("characters") ?? [];
   const texts = watch("text_overlays") ?? [];
+
+  function setCaptionsEnabled(enabled: boolean) {
+    setValue("captions_enabled", enabled, { shouldDirty: true });
+  }
 
   function toggleCharacter(id: string) {
     const idx = characters.findIndex((c) => c.asset_id === id);
@@ -818,7 +845,7 @@ function MemeLookStep({
     const spot = DEFAULT_CHAR_SPOTS[characters.length % DEFAULT_CHAR_SPOTS.length];
     setValue(
       "characters",
-      [...characters, { asset_id: id, ...spot, scale: 0.35, flip: false, bob: true }],
+      [...characters, { asset_id: id, ...spot, scale: 0.35, flip: false, bob: true, rotation: 0 }],
       { shouldDirty: true },
     );
   }
@@ -828,6 +855,21 @@ function MemeLookStep({
       <Row label="Scene">
         <ScenePicker selected={sceneId} onSelect={(id) => setValue("scene_id", id, { shouldDirty: true })} />
         <FieldError msg={undefined} />
+      </Row>
+
+      <Row label="Background motion">
+        <Segmented
+          value={sceneAnimated ? "animated" : "static"}
+          onChange={(v) => setValue("scene_animated", v === "animated", { shouldDirty: true })}
+          options={[
+            { value: "static", label: "Static frame" },
+            { value: "animated", label: "Animated" },
+          ]}
+        />
+        <p className="text-[13px] text-muted-foreground">
+          Static pins gradient scenes to a single blended frame — the classic
+          fixed-background reel look.
+        </p>
       </Row>
 
       <Row label="Characters">
@@ -842,6 +884,22 @@ function MemeLookStep({
           sceneId={sceneId}
           characters={characters}
           texts={texts}
+          captions={{
+            enabled: watch("captions_enabled"),
+            y: watch("caption_y") ?? 0.65,
+            fontSize: watch("caption_font_size"),
+            color: watch("caption_color"),
+            outline: watch("caption_outline"),
+            words: watch("caption_words"),
+            position: watch("caption_position"),
+            onChange: setCaptionsEnabled,
+            onYChange: (v) =>
+              setValue(
+                "caption_y",
+                Math.min(0.95, Math.max(0.05, v)),
+                { shouldDirty: true },
+              ),
+          }}
           onCharactersChange={(next) => setValue("characters", next, { shouldDirty: true })}
           onTextsChange={(next) => setValue("text_overlays", next, { shouldDirty: true })}
         />

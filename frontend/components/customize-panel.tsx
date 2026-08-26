@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { DEFAULT_RENDER_SETTINGS, type RenderSettings } from "@/lib/types";
+import { DEFAULT_RENDER_SETTINGS, CAPTION_POSITION_Y, type RenderSettings } from "@/lib/types";
 import { CAPTION_COLOR_HEX, PhoneFramePreview } from "@/components/create/phone-preview";
 
 interface SegmentedOption<T extends string> {
@@ -125,7 +125,10 @@ export function CustomizePanel({
             <Label className="text-muted-foreground">Position</Label>
             <Segmented
               value={value.caption_position}
-              onChange={(v) => onChange({ caption_position: v })}
+              onChange={(v) =>
+                // Preset jumps keep the free-drag `caption_y` in sync.
+                onChange({ caption_position: v, caption_y: CAPTION_POSITION_Y[v] })
+              }
               options={[
                 { value: "lower", label: "Lower" },
                 { value: "center", label: "Center" },

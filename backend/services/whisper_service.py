@@ -38,13 +38,23 @@ def caption_style_from_settings(cfg: dict | None) -> dict:
         outline = max(0, min(12, int(cfg.get("caption_outline", DEFAULT_CAPTION_STYLE["outline"]))))
     except (TypeError, ValueError):
         outline = DEFAULT_CAPTION_STYLE["outline"]
+    margin_v = CAPTION_POSITION_MARGIN_V.get(
+        cfg.get("caption_position"), DEFAULT_CAPTION_STYLE["margin_v"]
+    )
+    # Free-drag placement wins over the position preset when present.
+    # caption_y is the block center as a frame-height fraction; alignment=2
+    # anchors the block bottom at H - MarginV, so invert through 1920px.
+    try:
+        caption_y = float(cfg.get("caption_y"))
+    except (TypeError, ValueError):
+        caption_y = None
+    if caption_y is not None and 0.02 <= caption_y <= 0.98:
+        margin_v = max(40, min(1880, int(round((1 - caption_y) * 1920))))
     return {
         **DEFAULT_CAPTION_STYLE,
         "fontsize": fontsize,
         "outline": outline,
-        "margin_v": CAPTION_POSITION_MARGIN_V.get(
-            cfg.get("caption_position"), DEFAULT_CAPTION_STYLE["margin_v"]
-        ),
+        "margin_v": margin_v,
         "primary": CAPTION_COLOR_PRIMARY.get(
             cfg.get("caption_color"), DEFAULT_CAPTION_STYLE["primary"]
         ),

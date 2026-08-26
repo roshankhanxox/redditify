@@ -153,9 +153,13 @@ export async function uploadCharacter(
   if (opts.bgRemoved) {
     try {
       const { removeBackground } = await import("@imgly/background-removal")
+      // Pin the data package version to the installed lib — the CDN's
+      // `latest` tag 404s, which silently disabled background removal.
+      const dataVersion = "1.7.0"
       const out = await removeBackground(file, {
         publicPath:
-          process.env.NEXT_PUBLIC_IMGLY_PATH || "https://staticimgly.com/@imgly/background-removal-data/latest/dist/",
+          process.env.NEXT_PUBLIC_IMGLY_PATH ||
+          `https://staticimgly.com/@imgly/background-removal-data/${dataVersion}/dist/`,
       })
       blob = out
       bgRemoved = true
