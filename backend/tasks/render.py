@@ -180,6 +180,7 @@ def generate_reel(self, job_id: str):
                 tmp_dir=tmp,
                 characters=characters,
                 text_pngs=text_pngs,
+                scene_animated=bool(cfg.get("scene_animated", True)),
             )
         else:
             set_status("PICKING_GAMEPLAY")
