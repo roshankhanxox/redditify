@@ -103,14 +103,16 @@ def generate_reel(self, job_id: str):
             style = whisper_service.caption_style_from_settings(cfg)
             chunk_size = max(1, min(3, int(cfg.get("caption_words", 2))))
 
-            static_text = str(cfg.get("caption_text") or "").strip()
+            static_text = whisper_service.strip_emoji(
+                str(cfg.get("caption_text") or "")
+            ).strip()
             if cfg.get("caption_mode") == "static" and static_text:
                 # Static mode: user-authored text. Skips Whisper entirely —
                 # no transcription cost.
                 duration = video.get_duration(voice_path)
                 if cfg.get("caption_layout") == "block":
                     chunks = whisper_service.static_block(
-                        static_text, duration, chunk_size,
+                        static_text, duration,
                         base_fontsize=int(cfg.get("caption_font_size", 96)),
                     )
                 else:

@@ -230,21 +230,55 @@ class TestStaticCaptions:
         from services.whisper_service import static_block
 
         text = "wait for it nobody expected this twist ending at all"
-        (chunk,) = static_block(text, 12.5, words_per_line=3, base_fontsize=96)
+        (chunk,) = static_block(text, 12.5, base_fontsize=96)
         assert chunk["start"] == 0.0 and chunk["end"] == 12.5
         m = re.match(r"\{\\fs(\d+)\}", chunk["text"])
         assert m
         fs = int(m.group(1))
         lines = chunk["text"].split("\n", 1)[1].split("\n")
-        assert all(len(l.split()) <= 3 for l in lines)
         longest = max(len(l) for l in lines)
         assert fs * longest * 0.55 <= 980 + 25      # width budget respected
         assert fs * len(lines) * 1.2 <= 1100 + 25   # height budget respected
 
+    def test_static_block_wraps_long_text(self):
+        import re
+
+        from services.whisper_service import static_block
+
+        text = " ".join(["word"] * 40)
+        (chunk,) = static_block(text, 20.0, base_fontsize=140)
+        fs = int(re.match(r"\{\\fs(\d+)\}", chunk["text"]).group(1))
+        lines = chunk["text"].split("\n", 1)[1].split("\n")
+        # Long text must wrap into many lines and shrink to fit vertically.
+        assert len(lines) > 3
+        assert fs < 140
+        assert fs * len(lines) * 1.2 <= 1100 + 25
+
+    def test_static_block_strips_emoji(self):
+        import re
+
+        from services.whisper_service import static_block
+
+        (chunk,) = static_block("hello \U0001F602 world \u2764", 8.0, base_fontsize=96)
+        m = re.match(r"\{\\fs(\d+)\}", chunk["text"])
+        assert m
+        body = chunk["text"][m.end():]
+        assert "\U0001F602" not in body and "\u2764" not in body
+        assert "HELLO" in body and "WORLD" in body
+
+    def test_strip_emoji(self):
+        from services.whisper_service import strip_emoji
+
+        assert strip_emoji("funny \U0001F602\U0001F602 post") == "funny post"
+        assert strip_emoji("\u2764\uFE0F") == ""
+        assert strip_emoji("plain text") == "plain text"
+
     def test_static_block_empty(self):
         from services.whisper_service import static_block
 
-        assert static_block("", 10.0, 3) == []
+        assert static_block("", 10.0) == []
+        assert static_block("\U0001F602", 10.0) == []          # emoji-only → nothing
+        assert len(static_block("\U0001F525 only emoji", 10.0)) == 1
 
     def test_sanitize_caption_layout(self):
         out = _sanitize_settings({"caption_layout": "BLOCK"})

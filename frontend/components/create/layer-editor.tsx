@@ -61,6 +61,17 @@ const TEXT_COLORS = ["#ffffff", "#000000", "#ff4500", "#ffe500", "#00e5ff"];
 const MAX_LAYERS = 3;
 const CAPTION_SAMPLE = "SO I QUIT MY JOB";
 
+/** Mirrors backend whisper_service.strip_emoji — libass burns no color emojis. */
+function stripEmoji(text: string): string {
+  return text
+    .replace(
+      /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{20E3}]+/gu,
+      "",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const fetcher = (url: string) => api.get(url).then((r) => r.data);
 
 /** Inject @font-face rules pointing at the render's own TTFs so the editor
@@ -767,10 +778,10 @@ export function LayerEditor({
               outline={captions.outline}
               words={captions.words}
               sample={
-                captions.mode === "static" && (captions.text ?? "").trim()
+                captions.mode === "static" && stripEmoji(captions.text ?? "")
                   ? (captions.layout ?? "chunks") === "block"
-                    ? (captions.text ?? "").trim()
-                    : (captions.text ?? "").trim().split(/\s+/).slice(0, captions.words * 2).join(" ")
+                    ? stripEmoji(captions.text ?? "")
+                    : stripEmoji(captions.text ?? "").split(/\s+/).slice(0, captions.words * 2).join(" ")
                   : undefined
               }
               draggable={!!captions.onYChange}
@@ -825,13 +836,13 @@ export function LayerEditor({
                     rows={3}
                     maxLength={600}
                     value={captions.text ?? ""}
-                    placeholder={"Caption text — shown in chunks.\ne.g. WAIT FOR IT...\nNOBODY EXPECTED THIS"}
+                    placeholder={"Caption text — emojis are stripped at render.\ne.g. WAIT FOR IT...\nNOBODY EXPECTED THIS"}
                     onChange={(e) => captions.onTextChange?.(e.target.value)}
                     className="text-sm"
                   />
                   <p className="text-[13px] text-muted-foreground">
                     {(captions.layout ?? "chunks") === "block"
-                      ? `Whole text on one auto-fitted screen — ${captions.words} words per line.`
+                      ? "Whole text on one screen — auto-wrapped & sized to fit."
                       : `Auto-split into ${captions.words}-word chunks, evenly timed.`}
                   </p>
                 </div>

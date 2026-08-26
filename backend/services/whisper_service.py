@@ -1,3 +1,5 @@
+import re
+
 import whisper
 
 # PlayRes is 1080x1920 (declared in chunks_to_ass); MarginV values below land
@@ -113,23 +115,51 @@ def even_chunks(text: str, duration: float, words_per_screen: int = 2) -> list[d
 _BLOCK_MAX_W = 980
 _BLOCK_MAX_H = 1100
 
+# libass burns captions without a dependable color-emoji font — pictographs
+# come out as tofu boxes. Strip them before rendering.
+_EMOJI_RE = re.compile(
+    "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF"
+    "\u2B00-\u2BFF\uFE0F\u200D\u20E3]+"
+)
 
-def static_block(text: str, duration: float, words_per_line: int = 4,
-                 base_fontsize: int = 96) -> list[dict]:
-    """Whole text as ONE caption event spanning the full duration, word-wrapped
-    to `words_per_line` per line and auto-fitted with an inline {\\fs} override
-    so libass shrinks the block instead of overflowing the frame."""
-    words = text.split()
+
+def strip_emoji(text: str) -> str:
+    return re.sub(r"\s+", " ", _EMOJI_RE.sub("", text)).strip()
+
+
+def _wrap_words(words: list[str], chars_per_line: int) -> list[str]:
+    lines: list[str] = []
+    cur = ""
+    for w in words:
+        cand = f"{cur} {w}".strip()
+        if len(cand) <= chars_per_line or not cur:
+            cur = cand
+        else:
+            lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def static_block(text: str, duration: float, base_fontsize: int = 96) -> list[dict]:
+    """Whole text as ONE caption event spanning the full duration. Lines fill
+    the frame width (greedy word wrap) and the font auto-shrinks until the
+    block fits the height budget — via an inline {\\fs} override."""
+    words = strip_emoji(text).split()
     if not words or duration <= 0:
         return []
-    wpl = max(1, min(6, int(words_per_line)))
-    lines = [" ".join(words[i : i + wpl]) for i in range(0, len(words), wpl)]
-    longest = max(len(line) for line in lines)
 
     fs = max(28, min(140, int(base_fontsize)))
-    fs = min(fs, int(_BLOCK_MAX_W / (longest * 0.55)))
-    fs = min(fs, int(_BLOCK_MAX_H / (len(lines) * 1.2)))
-    fs = max(24, fs)
+    while fs > 24:
+        cpl = max(6, int(_BLOCK_MAX_W / (fs * 0.55)))
+        lines = _wrap_words(words, cpl)
+        if len(lines) * fs * 1.2 <= _BLOCK_MAX_H:
+            break
+        fs -= 2
+    else:
+        cpl = max(6, int(_BLOCK_MAX_W / (24 * 0.55)))
+        lines = _wrap_words(words, cpl)
 
     return [{
         "text": f"{{\\fs{fs}}}" + "\n".join(line.upper() for line in lines),
