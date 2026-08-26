@@ -51,7 +51,7 @@ def reap_expired_reels():
         # Flush deletes first; if storage.delete raised we never reach here.
         db.execute(
             update(Job)
-            .where(Job.id.in_([job_id for job_id, _ in rows]))
+            .where(Job.id.in_([row[0] for row in rows]))
             .values(result_url=None, result_expired_at=datetime.now(timezone.utc))
         )
         db.commit()

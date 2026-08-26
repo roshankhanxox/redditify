@@ -956,7 +956,18 @@ function MemeLookStep({
                 Math.min(0.95, Math.max(0.05, v)),
                 { shouldDirty: true },
               ),
-            onModeChange: (v) => setValue("caption_mode", v, { shouldDirty: true }),
+            onModeChange: (v) => {
+              setValue("caption_mode", v, { shouldDirty: true });
+              // Switching to static pre-fills the caption text from the story
+              // so users trim instead of re-typing.
+              if (v === "static" && !(watch("caption_text") ?? "").trim()) {
+                const story = (watch("story") ?? "").trim();
+                if (story) {
+                  setValue("caption_text", story.slice(0, 600), { shouldDirty: true });
+                  toast.info("Caption text prefilled from your story — trim it to the punchy bits");
+                }
+              }
+            },
             onTextChange: (v) => setValue("caption_text", v, { shouldDirty: true }),
           }}
           onCharactersChange={(next) => setValue("characters", next, { shouldDirty: true })}

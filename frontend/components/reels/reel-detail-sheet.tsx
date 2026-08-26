@@ -28,6 +28,11 @@ export function ReelDetailSheet({ job, open, onOpenChange, onDelete }: Props) {
   const playable = job.status === "DONE" && !!job.result_url;
   const st = (job.settings ?? {}) as Record<string, unknown>;
   const voiceLabel = VOICES.find((v) => v.id === st.voice)?.label ?? String(st.voice ?? "—");
+  // Regenerate must land back in the template the reel was made with.
+  const regenerateHref = `/dashboard/create/${st.template === "meme" ? "meme" : "story"}?from=${job.id}`;
+  const captionSummary = st.captions_enabled
+    ? `${st.caption_mode === "static" ? "Static · typed" : "Synced"} · ${String(st.caption_font_size ?? 96)}px · ${String(st.caption_color ?? "white")}`
+    : "Off";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -75,9 +80,7 @@ export function ReelDetailSheet({ job, open, onOpenChange, onDelete }: Props) {
             <MetaRow label="Speed">
               {typeof st.speed === "number" ? `${st.speed.toFixed(2)}×` : "—"}
             </MetaRow>
-            <MetaRow label="Captions">
-              st_captions(st)
-            </MetaRow>
+            <MetaRow label="Captions">{captionSummary}</MetaRow>
             <MetaRow label="Background">
               {st.gameplay_source === "user" ? "My footage" : `Library · ${String(st.gameplay_category ?? "any")}`}
             </MetaRow>
@@ -102,7 +105,7 @@ export function ReelDetailSheet({ job, open, onOpenChange, onDelete }: Props) {
               Download
             </Button>
             <Button variant="outline" asChild>
-              <Link href={`/dashboard/create/story?from=${job.id}`}>
+              <Link href={regenerateHref}>
                 <ArrowLeftRight />
                 Regenerate
               </Link>
