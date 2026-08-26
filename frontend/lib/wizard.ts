@@ -62,7 +62,7 @@ export const wizardSchema = z
   .object({
     template: z.enum(["story", "meme", "image"]),
     // Content
-    title: z.string().trim().min(1, "Give your reel a title").max(300),
+    title: z.string().trim().max(300),
     subreddit: z.string().trim().max(50).default(""),
     story: z.string().trim().min(1, "Paste a story first"),
     max_words: z.number().int().min(50).max(2000),
@@ -104,6 +104,14 @@ export const wizardSchema = z
     ...renderSchema.shape,
   })
   .superRefine((v, ctx) => {
+    // Reddit packaging — a reel title is a story-template concern.
+    if (v.template !== "meme" && !v.title.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["title"],
+        message: "Give your reel a title",
+      });
+    }
     if (
       v.template === "story" &&
       v.gameplay_source === "user" &&
@@ -233,8 +241,14 @@ export function buildPayload(s: WizardState) {
     retention: s.retention,
     max_words: s.max_words,
   };
+  // Memes skip the Reddit packaging: derive a title when the user skipped it.
+  const title =
+    s.title.trim() ||
+    (s.template === "meme"
+      ? (s.caption_text || s.story || "Meme reel").trim().replace(/\s+/g, " ").slice(0, 80)
+      : "");
   return {
-    title: s.title.trim(),
+    title,
     subreddit: s.subreddit.trim() || null,
     story: s.story.trim(),
     settings:

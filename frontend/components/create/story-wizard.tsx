@@ -182,7 +182,11 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
     : 0;
 
   async function goNext() {
-    const fields = STEP_FIELDS[STEPS[step].id];
+    // Memes don't require a Reddit title — only the story text.
+    const fields =
+      STEPS[step].id === "content" && template === "meme"
+        ? ["story"]
+        : STEP_FIELDS[STEPS[step].id];
     const ok = await trigger(fields as FieldName[], { shouldFocus: true });
     if (!ok) {
       toast.error("Fix the highlighted fields to continue");
@@ -267,18 +271,27 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
             <CardContent className="flex flex-col gap-5 p-6">
               {step === 0 && (
                 <>
-                  <Row label="Title" hint={err.title ? undefined : `${(getValues().title ?? "").length}/300`}>
+                  <Row
+                    label={isMeme ? "Title (optional)" : "Title"}
+                    hint={err.title ? undefined : `${(getValues().title ?? "").length}/300`}
+                  >
                     <Input
-                      placeholder={'e.g. "AITA for returning my roommate\'s vacuum?"'}
+                      placeholder={
+                        isMeme
+                          ? "Skip it — we'll name it from your caption"
+                          : 'e.g. "AITA for returning my roommate\'s vacuum?"'
+                      }
                       aria-invalid={!!err.title}
                       {...register("title")}
                     />
                     <FieldError msg={err.title?.message} />
                   </Row>
-                  <Row label="Subreddit label (optional)">
-                    <Input placeholder="AskReddit" {...register("subreddit")} />
-                  </Row>
-                  <Row label="Story / post content" hint={`${wordCount} words`}>
+                  {!isMeme && (
+                    <Row label="Subreddit label (optional)">
+                      <Input placeholder="AskReddit" {...register("subreddit")} />
+                    </Row>
+                  )}
+                  <Row label={isMeme ? "Voiceover text" : "Story / post content"} hint={`${wordCount} words`}>
                     <Textarea
                       rows={12}
                       className="resize-y"
@@ -590,11 +603,14 @@ function ReviewSummary({
       title: "Content",
       step: 0,
       rows: [
-        ["Title", values.title],
-        ["Subreddit", values.subreddit || "—"],
-        ["Length cap", duration],
+        ...(values.title ? ([["Title", values.title]] as [string, React.ReactNode][]) : []),
+        ...(values.template !== "meme"
+          ? ([
+              ["Subreddit", values.subreddit || "—"],
+            ] as [string, React.ReactNode][])
+          : []),
         [
-          "Story",
+          values.template === "meme" ? "Voiceover text" : "Story",
           `${wordCountOf(values.story)} words · "${truncate(values.story, 80)}"`,
         ],
       ],
