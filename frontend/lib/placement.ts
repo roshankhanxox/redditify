@@ -15,6 +15,8 @@ export interface CharacterPlacement {
   scale: number;
   flip: boolean;
   bob: boolean;
+  /** Degrees clockwise, [-180..180]. Absent = upright (pre-rotation jobs). */
+  rotation?: number;
 }
 
 export interface TextPlacement {
@@ -35,8 +37,10 @@ export const LAYER_LIMITS = {
   yMax: 1,
   charScaleMin: 0.05,
   charScaleMax: 0.9,
-  textScaleMin: 0.1,
-  textScaleMax: 0.95,
+  // Text scale is a FONT calibration: rendered px @1080w = scale * 240
+  // (browser: calc(scale * 22.2cqw)), mirrored by services/text_overlay.py.
+  textScaleMin: 0.02,
+  textScaleMax: 0.98,
 } as const;
 
 export function clamp01(v: number): number {
