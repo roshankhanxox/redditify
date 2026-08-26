@@ -89,7 +89,12 @@ def generate_reel(self, job_id: str):
         voice_path = os.path.join(tmp, "voice.mp3")
         if storage.download(_scratch_key(job_id, "voice.mp3"), voice_path) is None:
             set_status("GENERATING_VOICEOVER")
-            text = preprocess_text(raw_story, subreddit_label, title, max_words=cfg.get("max_words", 1200))
+            text = preprocess_text(
+                raw_story,
+                context_label=subreddit_label if template == "story" else "",
+                title=title if template == "story" else "",
+                max_words=cfg.get("max_words", 1200),
+            )
             audio_path = tts.generate_voiceover(
                 text,
                 cfg.get("voice", "male"),
@@ -167,14 +172,38 @@ def generate_reel(self, job_id: str):
             )
             storage.upload(card_path, _scratch_key(job_id, "title.png"), keep_local=True)
 
-        if template == "meme":
+        if template in ("meme", "image"):
             # Meme composite: procedural/animated scene background instead of
             # gameplay. Pitch is applied AFTER transcription so the word-synced
             # subtitles above still match the unshifted audio timeline.
             from services import scenes as scenes_service
             from services.text_overlay import render_text_overlay
 
-            scene = scenes_service.get_scene(cfg.get("scene_id")) or scenes_service.SCENES[0]
+            scene = (
+                scenes_service.get_scene(cfg.get("scene_id")) or scenes_service.SCENES[0]
+                if template == "meme"
+                else None
+            )
+            if scene is None:
+                # Image reel: the user's uploaded photo is the background.
+                from models import UserBackground
+
+                bg_id = str(cfg.get("background_id") or "")
+                if not bg_id:
+                    raise RuntimeError("image template requires background_id")
+                with SyncSessionLocal() as db:
+                    row = db.get(UserBackground, uuid.UUID(bg_id))
+                    if row is None or str(row.user_id) != user_id or row.status != "ready":
+                        raise RuntimeError(f"uploaded photo not ready: {bg_id}")
+                    clip_key = row.clip_key
+                if not clip_key:
+                    raise RuntimeError(f"uploaded photo has no processed file: {bg_id}")
+                scene = {
+                    "id": f"user-{bg_id[:8]}",
+                    "kind": "user_image",
+                    "params": {"key": clip_key},
+                }
+
             pitch = float(cfg.get("tts_pitch") or 0)
             voice_for_render = voice_path
             if abs(pitch) >= 0.01:
