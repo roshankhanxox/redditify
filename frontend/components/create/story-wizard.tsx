@@ -50,6 +50,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CustomizePanel, Segmented } from "@/components/customize-panel";
 import { cn } from "@/lib/utils";
+import { SCENE_LABELS } from "@/lib/scenes";
 import { PhoneFramePreview } from "@/components/create/phone-preview";
 import { Stepper } from "@/components/create/stepper";
 
@@ -698,15 +699,6 @@ const wordCountOf = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0)
 const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 
 // ------------------------------------------------------------------ meme look
-
-const SCENE_LABELS: Record<string, string> = {
-  rainbow: "Rainbow Drift",
-  sunset: "Sunset",
-  ocean: "Ocean",
-  candy: "Candy Pastel",
-  midnight: "Starry Night",
-  forest: "Mint Forest",
-};
 
 function ScenePicker({
   selected,
