@@ -43,7 +43,9 @@ export type TemplateId = (typeof TEMPLATES)[number]["id"];
 const renderSchema = z.object({
   captions_enabled: z.boolean(),
   caption_mode: z.enum(["synced", "static"]),
+  caption_layout: z.enum(["chunks", "block"]),
   caption_font_size: z.number().int().min(48).max(140),
+  caption_scale: z.number().int().min(50).max(100),
   caption_position: z.enum(["lower", "center", "upper"]),
   caption_y: z.number().min(0.05).max(0.95),
   caption_color: z.enum(["white", "yellow", "brand"]),
@@ -60,7 +62,7 @@ export const wizardSchema = z
   .object({
     template: z.enum(["story", "meme", "image"]),
     // Content
-    title: z.string().trim().min(1, "Give your reel a title").max(300),
+    title: z.string().trim().max(300),
     subreddit: z.string().trim().max(50).default(""),
     story: z.string().trim().min(1, "Paste a story first"),
     max_words: z.number().int().min(50).max(2000),
@@ -102,6 +104,14 @@ export const wizardSchema = z
     ...renderSchema.shape,
   })
   .superRefine((v, ctx) => {
+    // Reddit packaging — a reel title is a story-template concern.
+    if (v.template !== "meme" && !v.title.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["title"],
+        message: "Give your reel a title",
+      });
+    }
     if (
       v.template === "story" &&
       v.gameplay_source === "user" &&
@@ -182,8 +192,10 @@ export const STEP_FIELDS: Record<(typeof STEPS)[number]["id"], string[]> = {
     "retention",
     "captions_enabled",
     "caption_mode",
+    "caption_layout",
     "caption_text",
     "caption_font_size",
+    "caption_scale",
     "caption_position",
     "caption_y",
     "caption_color",
@@ -203,7 +215,9 @@ export function buildPayload(s: WizardState) {
   const render: RenderSettings = {
     captions_enabled: s.captions_enabled,
     caption_mode: s.caption_mode,
+    caption_layout: s.caption_layout,
     caption_font_size: s.caption_font_size,
+    caption_scale: s.caption_scale ?? 100,
     caption_position: s.caption_position,
     caption_y: s.caption_y,
     caption_color: s.caption_color,
@@ -223,11 +237,18 @@ export function buildPayload(s: WizardState) {
     expressiveness: s.expressiveness,
     ...render,
     caption_text: s.caption_text,
+    caption_layout: s.caption_layout,
     retention: s.retention,
     max_words: s.max_words,
   };
+  // Memes skip the Reddit packaging: derive a title when the user skipped it.
+  const title =
+    s.title.trim() ||
+    (s.template === "meme"
+      ? (s.caption_text || s.story || "Meme reel").trim().replace(/\s+/g, " ").slice(0, 80)
+      : "");
   return {
-    title: s.title.trim(),
+    title,
     subreddit: s.subreddit.trim() || null,
     story: s.story.trim(),
     settings:
@@ -336,8 +357,10 @@ export function stateFromJob(job: {
     retention: pick(st.retention, ["ephemeral", "retain"] as const, "ephemeral"),
     captions_enabled: bool(st.captions_enabled, true),
     caption_mode: pick(st.caption_mode, ["synced", "static"] as const, "synced"),
+    caption_layout: pick(st.caption_layout, ["chunks", "block"] as const, "chunks"),
     caption_text: typeof st.caption_text === "string" ? st.caption_text.slice(0, 600) : "",
     caption_font_size: num(st.caption_font_size, 96, 48, 140),
+    caption_scale: num(st.caption_scale, 100, 50, 100),
     caption_position: pick(st.caption_position, ["lower", "center", "upper"] as const, "lower"),
     caption_y: num(
       st.caption_y,

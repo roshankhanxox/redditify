@@ -224,6 +224,78 @@ class TestStaticCaptions:
             {"text": "HI THERE YOU", "start": 0.0, "end": 6.0},
         ]
 
+# Static captions now render as PNGs (services/caption_png.py) — emoji-capable.
+
+
+class TestCaptionPng:
+    def test_plain_text_fits_budget_and_crops(self):
+        from PIL import Image
+
+        from services.caption_png import MAX_H, MAX_W, render_caption_png
+        import tempfile
+
+        info = render_caption_png(
+            "wait for it nobody expected this twist ending at all",
+            os.path.join(tempfile.gettempdir(), "cap-test.png"),
+            fontsize=140,
+        )
+        assert info["width"] <= MAX_W + 60 and info["height"] <= MAX_H + 60
+        im = Image.open(info["path"])
+        assert im.mode == "RGBA" and im.width > 50 and im.height > 20
+
+    def test_deterministic(self):
+        import tempfile
+
+        from services.caption_png import render_caption_png
+
+        a = os.path.join(tempfile.gettempdir(), "cap-a.png")
+        b = os.path.join(tempfile.gettempdir(), "cap-b.png")
+        render_caption_png("same text", a, fontsize=96)
+        render_caption_png("same text", b, fontsize=96)
+        assert open(a, "rb").read() == open(b, "rb").read()
+
+    def test_empty_raises(self):
+        import pytest
+
+        from services.caption_png import render_caption_png
+
+        with pytest.raises(ValueError):
+            render_caption_png("   ", os.path.join(tempfile.gettempdir(), "cap-x.png"))
+
+    def test_emoji_renders_colored_pixels(self):
+        """Network-guarded: Twemoji assets are fetched at draw time."""
+        import socket
+        import tempfile
+
+        from services.caption_png import render_caption_png
+
+        try:
+            socket.create_connection(("cdn.jsdelivr.net", 443), timeout=3)
+        except OSError:
+            pytest.skip("offline — Twemoji fetch unavailable")
+
+        plain = render_caption_png("hello world", os.path.join(tempfile.gettempdir(), "cap-p.png"))
+        emoji = render_caption_png(
+            "hello \U0001F602 world", os.path.join(tempfile.gettempdir(), "cap-e.png"),
+        )
+        assert abs(emoji["width"] - plain["width"]) > 5 or abs(emoji["height"] - plain["height"]) > 5
+
+    def test_sanitize_caption_layout(self):
+        out = _sanitize_settings({"caption_layout": "BLOCK"})
+        assert out["caption_layout"] == "chunks"    # unknown → chunks
+        out = _sanitize_settings({"caption_layout": "block"})
+        assert out["caption_layout"] == "block"
+        out = _sanitize_settings({})
+        assert out["caption_layout"] == "chunks"
+
+    def test_sanitize_caption_scale(self):
+        out = _sanitize_settings({"caption_scale": 30})
+        assert out["caption_scale"] == 50
+        out = _sanitize_settings({"caption_scale": 5000})
+        assert out["caption_scale"] == 100
+        out = _sanitize_settings({})
+        assert out["caption_scale"] == 100
+
 
 # ---------------------------------------------------------------- title card
 

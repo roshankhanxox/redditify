@@ -183,7 +183,9 @@ function ActionMenu({ job, actions }: { job: Job; actions: ReelActions }) {
           Download MP4
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href={`/dashboard/create/story?from=${job.id}`}>
+          <Link
+            href={`/dashboard/create/${job.settings?.template === "meme" ? "meme" : "story"}?from=${job.id}`}
+          >
             <ArrowLeftRight />
             Regenerate
           </Link>

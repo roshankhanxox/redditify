@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import sys
@@ -7,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from celery import Celery
 
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 # Ensure the backend/ directory is importable regardless of how the
 # worker process was launched (celery does not always put cwd on sys.path).
@@ -99,24 +102,58 @@ def generate_reel(self, job_id: str):
             storage.upload(audio_path, _scratch_key(job_id, "voice.mp3"), keep_local=True)
 
         srt_path = os.path.join(tmp, "subs.ass")
+        caption_pngs: list[dict] | None = None
         if captions_on and storage.download(_scratch_key(job_id, "subs.ass"), srt_path) is None:
             style = whisper_service.caption_style_from_settings(cfg)
             chunk_size = max(1, min(3, int(cfg.get("caption_words", 2))))
 
             static_text = str(cfg.get("caption_text") or "").strip()
             if cfg.get("caption_mode") == "static" and static_text:
-                # Static mode: user-authored text, evenly sliced across the
-                # voiceover. Skips Whisper entirely — no transcription cost.
+                # Static mode: user-authored text rendered as transparent PNGs
+                # (Pillow + Twemoji) — real color emojis, no libass — and the
+                # Whisper stage is skipped entirely.
+                from services import caption_png
+
                 duration = video.get_duration(voice_path)
-                chunks = whisper_service.even_chunks(static_text, duration, chunk_size)
+                cap_y = float(cfg.get("caption_y", 0.65))
+                spec = {
+                    "fontsize": round(
+                        int(cfg.get("caption_font_size", 96))
+                        * int(cfg.get("caption_scale", 100)) / 100
+                    ),
+                    "color": str(cfg.get("caption_color", "white")),
+                    "outline": int(cfg.get("caption_outline", 6)),
+                }
+                if cfg.get("caption_layout") == "block":
+                    spans = [{"text": static_text, "start": 0.0, "end": duration}]
+                else:
+                    MAX_CAPTION_PNGS = 30
+                    spans = whisper_service.even_chunks(static_text, duration, chunk_size)
+                    if len(spans) > MAX_CAPTION_PNGS:
+                        logger.warning(
+                            "static captions: %d chunks exceed cap, truncating",
+                            len(spans),
+                        )
+                        spans = spans[:MAX_CAPTION_PNGS]
+                caption_pngs = []
+                for i, sp in enumerate(spans):
+                    info = caption_png.render_caption_png(
+                        sp["text"], os.path.join(tmp, f"cap-{i}.png"), **spec,
+                    )
+                    storage.upload(
+                        info["path"], _scratch_key(job_id, f"cap-{i}.png"), keep_local=True,
+                    )
+                    caption_pngs.append({
+                        **info, "y": cap_y, "start": sp["start"], "end": sp["end"],
+                    })
             else:
                 set_status("TRANSCRIBING")
                 words = whisper_service.transcribe(voice_path)
                 chunks = whisper_service.words_to_chunks(words, chunk_size=chunk_size)
 
-            if chunks:
-                whisper_service.chunks_to_ass(chunks, srt_path, style=style)
-                storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
+                if chunks:
+                    whisper_service.chunks_to_ass(chunks, srt_path, style=style)
+                    storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
 
         card_path = os.path.join(tmp, "title.png")
         if title_on and storage.download(_scratch_key(job_id, "title.png"), card_path) is None:
@@ -184,11 +221,12 @@ def generate_reel(self, job_id: str):
                 scene,
                 voice_for_render,
                 os.path.join(tmp, "output.mp4"),
-                subs=srt_path if captions_on else None,
+                subs=srt_path if (captions_on and caption_pngs is None) else None,
                 tmp_dir=tmp,
                 characters=characters,
                 text_pngs=text_pngs,
                 scene_animated=bool(cfg.get("scene_animated", True)),
+                caption_pngs=caption_pngs,
             )
         else:
             set_status("PICKING_GAMEPLAY")

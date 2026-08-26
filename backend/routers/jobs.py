@@ -180,8 +180,11 @@ def _sanitize_settings(s: dict) -> dict:
     out["captions_enabled"] = _to_bool(s.get("captions_enabled"), True)
     mode = s.get("caption_mode")
     out["caption_mode"] = mode if mode in ("synced", "static") else "synced"
+    layout = s.get("caption_layout")
+    out["caption_layout"] = layout if layout in ("chunks", "block") else "chunks"
     out["caption_text"] = str(s.get("caption_text") or "").strip()[:600]
     out["caption_font_size"] = _clamp_int(s, "caption_font_size", 96, 48, 140)
+    out["caption_scale"] = _clamp_int(s, "caption_scale", 100, 50, 100)
     position = s.get("caption_position")
     out["caption_position"] = position if position in VALID_CAPTION_POSITIONS else "lower"
     # Free-drag caption placement; defaults to the position preset's height.

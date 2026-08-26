@@ -4,18 +4,30 @@ Turn any story into a short-form vertical video (9:16, 1080×1920) ready for You
 
 > **Design note:** the original spec used the Reddit API to fetch posts. Reddit now gates API access behind an application/approval process, so ReelBot instead lets users **paste any post/story text directly** — same pipeline, zero API keys required.
 
+## Formats
+
+| Template | Status | Recipe |
+|---|---|---|
+| **Story Reel** | live | Pasted post → voiceover → Whisper-synced captions → gameplay loop → title card |
+| **Meme Studio** | live | Gradient scene (static frame or animated) → cutout characters (rotate/bob) → typed text layers → synced **or** static typed captions → pitched kid/adult TTS |
+| **Custom Image** | soon | Upload a photo, we crop it vertical and add captions + TTS |
+
 ## Features
 
 - Paste-a-story editor with title, subreddit label, and word count
-- 10 voices across both engines, speech-speed control (0.8×–1.5×)
-- Voice engine picker: **Auto** (ElevenLabs → free fallback), **ElevenLabs** premium, or **Local TTS** (free)
+- 20+ voices across both engines — including regional accents (US, UK, Irish, Kenyan, Nigerian, South African) and **Indian Hinglish** voices that read romanized Hindi ("TUMHE") with the desi delivery — plus personality presets (Friendly / Hype / Calm / Serious)
+- Voice engine picker: **Auto** (ElevenLabs → free fallback), **ElevenLabs** premium, or **Local TTS** (free) — the voice list adapts to the engine
 - Word-synced subtitles (Whisper, local model — no cloud calls) rendered as big, shorts-style captions
-- Pillow-rendered title cards (dark / light / minimal) with subreddit label
+- **Static captions mode**: type your own text, no transcription — either timed chunks or one full-screen block, auto-wrapped and auto-fitted, with **real color emojis** (Twemoji-composited PNG overlays)
+- Draggable caption placement anywhere on the frame (free `caption_y`, not just 3 presets)
+- Layer editor: drag/8-handle resize/rotation knobs, inline styled text editing, WYSIWYG full-screen caption preview
+- Character cutouts: upload or drag-&-drop with in-browser background removal (@imgly), place up to 3 per reel
+- Pillow-rendered title cards (dark / light / minimal) with subreddit label — story template only
 - Gameplay background auto-loops to voiceover length; auto-transcoded to 1080×1920
 - Job queue (Celery + Redis) with live status tracking and exponential-backoff polling
 - Quota system: 3/day, 30/month for free users; admins unlimited
 - Admin panel: stats, user management, clip uploads, all-jobs view
-- S3/MinIO storage backend with presigned downloads, user-uploaded background footage,
+- S3/MinIO storage backend with presigned downloads, user-uploaded footage,
   reel retention (ephemeral auto-delete vs premium keep) and automatic garbage collection
 
 ## Architecture
@@ -38,6 +50,8 @@ flowchart LR
 ## Pipeline
 
 Job status lives in PostgreSQL (source of truth). The dashboard polls `/jobs/{id}` with exponential backoff (1.5s → 12s) and stops on terminal states:
+
+**Story template** follows the full chain below. **Meme Studio** branches after the voiceover: gradient scene (+ optional character/text layers) instead of gameplay, captions either Whisper-synced or static typed text (rendered as Twemoji PNG overlays — no transcription), pitch applied between TTS and compositing.
 
 ```mermaid
 flowchart TD
@@ -312,6 +326,8 @@ sequenceDiagram
 | Celery task errors `got Future attached to a different loop` | async SQLAlchemy pool reused across `asyncio.run()` loops in worker | worker code uses the sync session (`sync_db.py`) — don't call async services from tasks directly |
 | ElevenLabs 400 "api_key_id_used_as_api_key" / "exactly 51 characters" | wrong credential copied | copy the actual key (`sk_…`, 51 chars) from elevenlabs.io profile |
 | FFmpeg installed but `subtitles` filter missing | Homebrew's default FFmpeg formula dropped libass | use the homebrew-ffmpeg tap: `brew tap homebrew-ffmpeg/ffmpeg && brew install homebrew-ffmpeg/ffmpeg/ffmpeg` |
+| Backend edits don't take effect on new renders | the Celery worker does NOT hot-reload (only uvicorn with `--reload` does) | restart the worker after changing `backend/` code |
+| Emojis missing from **synced** captions | libass has no dependable color-emoji font | expected: synced captions transcribe speech (no emojis). Static typed captions DO render emojis via Twemoji PNG overlays |
 
 ## API Summary
 
@@ -325,6 +341,8 @@ sequenceDiagram
 | GET | `/jobs` · `/jobs/{id}` · DELETE `/jobs/{id}` | ✓ | history / detail / delete |
 | GET | `/jobs/{id}/download` | ✓ | final MP4 |
 | GET | `/assets` | ✓ | categories + clips for UI |
+| GET/POST | `/characters` · `/characters/init` · `/{id}/complete` · `/{id}/file` · DELETE | ✓ | meme character cutouts (presigned PUT, in-browser bg removal) |
+| GET | `/fonts` · `/scenes` | ✓ | editor registries (typefaces, gradient scenes) |
 | POST/PATCH/DELETE | `/admin/assets[/{id}]` | admin | upload / toggle / delete clips |
 | GET/PATCH | `/admin/users[/{id}]` | admin | list / change role, reset quota |
 | GET | `/admin/jobs` · `/admin/stats` | admin | all jobs / dashboard stats |

@@ -93,7 +93,7 @@ def words_to_chunks(words: list[dict], chunk_size: int = 2) -> list[dict]:
 
 
 def even_chunks(text: str, duration: float, words_per_screen: int = 2) -> list[dict]:
-    """Static-caption mode: split user text into word groups shown for equal
+    """Static-caption timing: split user text into word groups shown for equal
     slices of the voiceover duration. No transcription — pacing is uniform,
     which is exactly the trade static captions opt into."""
     words = text.split()
@@ -106,6 +106,11 @@ def even_chunks(text: str, duration: float, words_per_screen: int = 2) -> list[d
         {"text": g.upper(), "start": round(i * step, 3), "end": round((i + 1) * step, 3)}
         for i, g in enumerate(groups)
     ]
+
+
+# Static-caption block rendering (fit-to-box wrap, emoji support) lives in
+# services/caption_png.py — libass can't do color emojis, so static text is
+# composited as PNG overlays instead of burned ASS events.
 
 
 def chunks_to_srt(chunks: list[dict], path: str) -> str:

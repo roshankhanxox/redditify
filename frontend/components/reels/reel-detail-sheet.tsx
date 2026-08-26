@@ -15,6 +15,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ExpiryBadge, STATUS_VARIANT } from "@/components/reels/reel-card";
+import { SCENE_LABELS } from "@/lib/scenes";
 
 interface Props {
   job: Job | null;
@@ -28,6 +29,12 @@ export function ReelDetailSheet({ job, open, onOpenChange, onDelete }: Props) {
   const playable = job.status === "DONE" && !!job.result_url;
   const st = (job.settings ?? {}) as Record<string, unknown>;
   const voiceLabel = VOICES.find((v) => v.id === st.voice)?.label ?? String(st.voice ?? "—");
+  // Regenerate must land back in the template the reel was made with.
+  const regenerateHref = `/dashboard/create/${st.template === "meme" ? "meme" : "story"}?from=${job.id}`;
+  const captionSummary = st.captions_enabled
+    ? `${st.caption_mode === "static" ? "Static · typed" : "Synced"} · ${String(st.caption_font_size ?? 96)}px · ${String(st.caption_color ?? "white")}`
+    : "Off";
+  const isMeme = st.template === "meme";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -75,12 +82,21 @@ export function ReelDetailSheet({ job, open, onOpenChange, onDelete }: Props) {
             <MetaRow label="Speed">
               {typeof st.speed === "number" ? `${st.speed.toFixed(2)}×` : "—"}
             </MetaRow>
-            <MetaRow label="Captions">
-              st_captions(st)
-            </MetaRow>
-            <MetaRow label="Background">
-              {st.gameplay_source === "user" ? "My footage" : `Library · ${String(st.gameplay_category ?? "any")}`}
-            </MetaRow>
+            <MetaRow label="Captions">{captionSummary}</MetaRow>
+            {isMeme ? (
+              <MetaRow label="Scene">
+                {SCENE_LABELS[String(st.scene_id ?? "")] ?? String(st.scene_id ?? "—")}
+                {Array.isArray(st.characters) && st.characters.length > 0
+                  ? ` · ${st.characters.length} character${st.characters.length > 1 ? "s" : ""}`
+                  : ""}
+              </MetaRow>
+            ) : (
+              <MetaRow label="Background">
+                {st.gameplay_source === "user"
+                  ? "My footage"
+                  : `Library · ${String(st.gameplay_category ?? "any")}`}
+              </MetaRow>
+            )}
             <MetaRow label="Duration">
               {job.duration_seconds ? `${Math.round(job.duration_seconds)}s` : "—"}
             </MetaRow>
@@ -102,7 +118,7 @@ export function ReelDetailSheet({ job, open, onOpenChange, onDelete }: Props) {
               Download
             </Button>
             <Button variant="outline" asChild>
-              <Link href={`/dashboard/create/story?from=${job.id}`}>
+              <Link href={regenerateHref}>
                 <ArrowLeftRight />
                 Regenerate
               </Link>
@@ -116,11 +132,6 @@ export function ReelDetailSheet({ job, open, onOpenChange, onDelete }: Props) {
       </SheetContent>
     </Sheet>
   );
-}
-
-function captionsSummary(st: Record<string, unknown>): string {
-  if (!st.captions_enabled) return "Off";
-  return `On · ${String(st.caption_font_size ?? 96)}px · ${String(st.caption_color ?? "white")}`;
 }
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {

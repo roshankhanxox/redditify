@@ -50,6 +50,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CustomizePanel, Segmented } from "@/components/customize-panel";
 import { cn } from "@/lib/utils";
+import { SCENE_LABELS } from "@/lib/scenes";
 import { PhoneFramePreview } from "@/components/create/phone-preview";
 import { Stepper } from "@/components/create/stepper";
 
@@ -181,7 +182,11 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
     : 0;
 
   async function goNext() {
-    const fields = STEP_FIELDS[STEPS[step].id];
+    // Memes don't require a Reddit title — only the story text.
+    const fields =
+      STEPS[step].id === "content" && template === "meme"
+        ? ["story"]
+        : STEP_FIELDS[STEPS[step].id];
     const ok = await trigger(fields as FieldName[], { shouldFocus: true });
     if (!ok) {
       toast.error("Fix the highlighted fields to continue");
@@ -266,18 +271,27 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
             <CardContent className="flex flex-col gap-5 p-6">
               {step === 0 && (
                 <>
-                  <Row label="Title" hint={err.title ? undefined : `${(getValues().title ?? "").length}/300`}>
+                  <Row
+                    label={isMeme ? "Title (optional)" : "Title"}
+                    hint={err.title ? undefined : `${(getValues().title ?? "").length}/300`}
+                  >
                     <Input
-                      placeholder={'e.g. "AITA for returning my roommate\'s vacuum?"'}
+                      placeholder={
+                        isMeme
+                          ? "Skip it — we'll name it from your caption"
+                          : 'e.g. "AITA for returning my roommate\'s vacuum?"'
+                      }
                       aria-invalid={!!err.title}
                       {...register("title")}
                     />
                     <FieldError msg={err.title?.message} />
                   </Row>
-                  <Row label="Subreddit label (optional)">
-                    <Input placeholder="AskReddit" {...register("subreddit")} />
-                  </Row>
-                  <Row label="Story / post content" hint={`${wordCount} words`}>
+                  {!isMeme && (
+                    <Row label="Subreddit label (optional)">
+                      <Input placeholder="AskReddit" {...register("subreddit")} />
+                    </Row>
+                  )}
+                  <Row label={isMeme ? "Voiceover text" : "Story / post content"} hint={`${wordCount} words`}>
                     <Textarea
                       rows={12}
                       className="resize-y"
@@ -400,7 +414,9 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                 </>
               )}
 
-              {step === 2 && isMeme && <MemeLookStep watch={watch} setValue={setValue} />}
+              {step === 2 && isMeme && (
+                <MemeLookStep watch={watch} setValue={setValue} canRetain={canRetain ?? false} />
+              )}
 
               {step === 2 && !isMeme && (
                 <>
@@ -409,7 +425,9 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                     value={{
                       captions_enabled: s.captions_enabled,
                       caption_mode: s.caption_mode,
+                      caption_layout: s.caption_layout,
                       caption_font_size: s.caption_font_size,
+                      caption_scale: s.caption_scale ?? 100,
                       caption_position: s.caption_position,
                       caption_y: s.caption_y,
                       caption_color: s.caption_color,
@@ -585,11 +603,14 @@ function ReviewSummary({
       title: "Content",
       step: 0,
       rows: [
-        ["Title", values.title],
-        ["Subreddit", values.subreddit || "—"],
-        ["Length cap", duration],
+        ...(values.title ? ([["Title", values.title]] as [string, React.ReactNode][]) : []),
+        ...(values.template !== "meme"
+          ? ([
+              ["Subreddit", values.subreddit || "—"],
+            ] as [string, React.ReactNode][])
+          : []),
         [
-          "Story",
+          values.template === "meme" ? "Voiceover text" : "Story",
           `${wordCountOf(values.story)} words · "${truncate(values.story, 80)}"`,
         ],
       ],
@@ -697,15 +718,6 @@ const wordCountOf = (t: string) => (t.trim() ? t.trim().split(/\s+/).length : 0)
 const capitalize = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 
 // ------------------------------------------------------------------ meme look
-
-const SCENE_LABELS: Record<string, string> = {
-  rainbow: "Rainbow Drift",
-  sunset: "Sunset",
-  ocean: "Ocean",
-  candy: "Candy Pastel",
-  midnight: "Starry Night",
-  forest: "Mint Forest",
-};
 
 function ScenePicker({
   selected,
@@ -869,9 +881,11 @@ function CharacterPicker({
 function MemeLookStep({
   watch,
   setValue,
+  canRetain,
 }: {
   watch: UseFormWatch<WizardInput>;
   setValue: UseFormSetValue<WizardInput>;
+  canRetain: boolean;
 }) {
   const sceneId = watch("scene_id");
   const sceneAnimated = watch("scene_animated");
@@ -948,6 +962,8 @@ function MemeLookStep({
             words: watch("caption_words"),
             position: watch("caption_position"),
             mode: watch("caption_mode") ?? "synced",
+            layout: watch("caption_layout") ?? "chunks",
+            scale: watch("caption_scale") ?? 100,
             text: watch("caption_text") ?? "",
             onChange: setCaptionsEnabled,
             onYChange: (v) =>
@@ -956,7 +972,20 @@ function MemeLookStep({
                 Math.min(0.95, Math.max(0.05, v)),
                 { shouldDirty: true },
               ),
-            onModeChange: (v) => setValue("caption_mode", v, { shouldDirty: true }),
+            onModeChange: (v) => {
+              setValue("caption_mode", v, { shouldDirty: true });
+              // Switching to static pre-fills the caption text from the story
+              // so users trim instead of re-typing.
+              if (v === "static" && !(watch("caption_text") ?? "").trim()) {
+                const story = (watch("story") ?? "").trim();
+                if (story) {
+                  setValue("caption_text", story.slice(0, 600), { shouldDirty: true });
+                  toast.info("Caption text prefilled from your story — trim it to the punchy bits");
+                }
+              }
+            },
+            onLayoutChange: (v) => setValue("caption_layout", v, { shouldDirty: true }),
+            onScaleChange: (v) => setValue("caption_scale", v, { shouldDirty: true }),
             onTextChange: (v) => setValue("caption_text", v, { shouldDirty: true }),
           }}
           onCharactersChange={(next) => setValue("characters", next, { shouldDirty: true })}
@@ -979,6 +1008,28 @@ function MemeLookStep({
           Pitch up for the classic meme sound. Applied after transcription, so
           captions stay word-synced.
         </p>
+      </Row>
+
+      <Row label="Keep the finished file?">
+        <RadioGroup
+          value={watch("retention")}
+          onValueChange={(v) => setValue("retention", v as "ephemeral" | "retain", { shouldDirty: true })}
+          className="flex gap-4"
+        >
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="ephemeral" id="meme-ret-ephemeral" />
+            <Label htmlFor="meme-ret-ephemeral" className="font-normal">Auto-delete (~15 min)</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="retain" id="meme-ret-retain" disabled={!canRetain} />
+            <Label htmlFor="meme-ret-retain" className={`font-normal ${canRetain ? "" : "opacity-50"}`}>
+              Keep until I delete
+            </Label>
+            {!canRetain && (
+              <Badge variant="outline" className="text-xs uppercase tracking-wide">premium</Badge>
+            )}
+          </div>
+        </RadioGroup>
       </Row>
     </>
   );
