@@ -47,12 +47,15 @@ function TitleCardMock({ s }: { s: RenderSettings }) {
 function CaptionMock({ s }: { s: RenderSettings }) {
   const px = (s.caption_font_size / 1080) * PREVIEW_W;
   const outlineW = Math.max(0.5, (s.caption_outline / 1080) * PREVIEW_W);
+  // Free-drag y wins; legacy position presets are the fallback for old jobs.
   const pos: React.CSSProperties =
-    s.caption_position === "upper"
-      ? { top: "22%" }
-      : s.caption_position === "center"
-        ? { top: "46%" }
-        : { bottom: "12%" };
+    typeof s.caption_y === "number"
+      ? { top: `${s.caption_y * 100}%`, transform: "translateY(-50%)" }
+      : s.caption_position === "upper"
+        ? { top: "22%" }
+        : s.caption_position === "center"
+          ? { top: "46%" }
+          : { bottom: "12%" };
   return (
     <div
       className="absolute inset-x-0 flex justify-center px-1 text-center font-extrabold uppercase"
