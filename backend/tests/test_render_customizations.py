@@ -189,6 +189,42 @@ class TestWordsToChunks:
         assert words_to_chunks([{"word": "quit", "start": 0, "end": 1}], chunk_size=1)[0]["text"] == "QUIT"
 
 
+# ------------------------------------------------------------- static captions
+
+
+class TestStaticCaptions:
+    def test_sanitize_mode_and_text(self):
+        out = _sanitize_settings({"caption_mode": "STATIC", "caption_text": "  hello world  "})
+        assert out["caption_mode"] == "synced"          # unknown → synced
+        assert out["caption_text"] == "hello world"
+        out = _sanitize_settings({"caption_mode": "static", "caption_text": "x" * 1000})
+        assert out["caption_mode"] == "static"
+        assert len(out["caption_text"]) == 600
+        out = _sanitize_settings({})
+        assert out["caption_mode"] == "synced" and out["caption_text"] == ""
+
+    def test_even_chunks_uniform_and_bounded(self):
+        from services.whisper_service import even_chunks
+
+        chunks = even_chunks("one two three four five six seven eight nine ten", 10.0, 2)
+        assert [c["text"] for c in chunks] == [
+            "ONE TWO", "THREE FOUR", "FIVE SIX", "SEVEN EIGHT", "NINE TEN",
+        ]
+        assert chunks[0]["start"] == 0.0
+        assert abs(chunks[-1]["end"] - 10.0) < 0.01
+        for a, b in zip(chunks, chunks[1:]):
+            assert abs(a["end"] - b["start"]) < 0.01   # contiguous, no gaps
+
+    def test_even_chunks_edge_cases(self):
+        from services.whisper_service import even_chunks
+
+        assert even_chunks("", 10.0, 2) == []
+        assert even_chunks("hi", 0.0, 2) == []
+        assert even_chunks("hi there you", 6.0, 99) == [   # words_per_screen clamps to ≤3
+            {"text": "HI THERE YOU", "start": 0.0, "end": 6.0},
+        ]
+
+
 # ---------------------------------------------------------------- title card
 
 

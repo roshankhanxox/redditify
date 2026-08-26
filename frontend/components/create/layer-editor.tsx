@@ -11,11 +11,12 @@ import {
   type CharacterPlacement,
   type TextPlacement,
 } from "@/lib/placement";
-import type { CaptionColor, CaptionPosition } from "@/lib/types";
+import type { CaptionColor, CaptionMode, CaptionPosition } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -36,7 +37,8 @@ export interface FontOption {
 /** Captions preview wiring: the toggle flips `captions_enabled` on the job,
  *  and when ON the canvas shows a demo caption ghost — draggable vertically —
  *  styled with the same knobs the ASS renderer will burn in (`y` maps to
- *  MarginV as (1-y)*1920 on the backend). */
+ *  MarginV as (1-y)*1920 on the backend). Mode: synced = Whisper word-synced;
+ *  static = user text evenly sliced across the voiceover, no transcription. */
 export interface CaptionPreview {
   enabled: boolean;
   y: number;
@@ -45,8 +47,12 @@ export interface CaptionPreview {
   outline: number;
   words: 1 | 2 | 3;
   position: CaptionPosition;
+  mode?: CaptionMode;
+  text?: string;
   onChange?: (enabled: boolean) => void;
   onYChange?: (y: number) => void;
+  onModeChange?: (mode: CaptionMode) => void;
+  onTextChange?: (text: string) => void;
 }
 
 const TEXT_COLORS = ["#ffffff", "#000000", "#ff4500", "#ffe500", "#00e5ff"];
@@ -221,6 +227,7 @@ function CaptionGhost({
   color,
   outline,
   words,
+  sample,
   draggable,
   onYChange,
   canvasRef,
@@ -230,6 +237,7 @@ function CaptionGhost({
   color: CaptionColor;
   outline: number;
   words: 1 | 2 | 3;
+  sample?: string;
   draggable: boolean;
   onYChange?: (y: number) => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
@@ -302,7 +310,7 @@ function CaptionGhost({
             paintOrder: "stroke fill",
           }}
         >
-          {CAPTION_SAMPLE.split(" ").slice(0, words).join(" ")}
+          {sample ?? CAPTION_SAMPLE.split(" ").slice(0, words).join(" ")}
         </span>
       </div>
     </div>
@@ -756,6 +764,11 @@ export function LayerEditor({
               color={captions.color}
               outline={captions.outline}
               words={captions.words}
+              sample={
+                captions.mode === "static" && (captions.text ?? "").trim()
+                  ? (captions.text ?? "").trim().split(/\s+/).slice(0, captions.words).join(" ")
+                  : undefined
+              }
               draggable={!!captions.onYChange}
               onYChange={captions.onYChange}
               canvasRef={canvasRef}
@@ -764,20 +777,52 @@ export function LayerEditor({
         </div>
       </div>
 
-      {/* Captions toggle */}
+      {/* Captions toggle + mode */}
       {captions && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5">
-          <div className="flex flex-col">
-            <Label>Captions</Label>
-            <p className="text-[13px] text-muted-foreground">
-              Auto word-synced captions on the voiceover.
-            </p>
+        <div className="flex flex-col gap-3 rounded-lg border bg-card px-3 py-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-col">
+              <Label>Captions</Label>
+              <p className="text-[13px] text-muted-foreground">
+                {captions.mode === "static"
+                  ? "Your text, evenly timed across the voiceover."
+                  : "Auto word-synced captions on the voiceover."}
+              </p>
+            </div>
+            <Switch
+              checked={captions.enabled}
+              disabled={!captions.onChange}
+              onCheckedChange={(v) => captions.onChange?.(v)}
+            />
           </div>
-          <Switch
-            checked={captions.enabled}
-            disabled={!captions.onChange}
-            onCheckedChange={(v) => captions.onChange?.(v)}
-          />
+          {captions.enabled && captions.onModeChange && (
+            <>
+              <Segmented
+                value={captions.mode ?? "synced"}
+                onChange={(v) => captions.onModeChange?.(v as CaptionMode)}
+                options={[
+                  { value: "synced", label: "Synced (auto)" },
+                  { value: "static", label: "Static (typed)" },
+                ]}
+              />
+              {captions.mode === "static" && (
+                <div className="flex flex-col gap-1">
+                  <Textarea
+                    rows={3}
+                    maxLength={600}
+                    value={captions.text ?? ""}
+                    placeholder={"Caption text — shown in chunks.\ne.g. WAIT FOR IT...\nNOBODY EXPECTED THIS"}
+                    onChange={(e) => captions.onTextChange?.(e.target.value)}
+                    className="text-sm"
+                  />
+                  <p className="text-[13px] text-muted-foreground">
+                    Split into {captions.words}-word chunks, evenly spaced. No
+                    transcription runs.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

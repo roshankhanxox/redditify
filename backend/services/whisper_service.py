@@ -92,6 +92,22 @@ def words_to_chunks(words: list[dict], chunk_size: int = 2) -> list[dict]:
     return chunks
 
 
+def even_chunks(text: str, duration: float, words_per_screen: int = 2) -> list[dict]:
+    """Static-caption mode: split user text into word groups shown for equal
+    slices of the voiceover duration. No transcription — pacing is uniform,
+    which is exactly the trade static captions opt into."""
+    words = text.split()
+    if not words or duration <= 0:
+        return []
+    size = max(1, min(3, int(words_per_screen)))
+    groups = [" ".join(words[i : i + size]) for i in range(0, len(words), size)]
+    step = duration / len(groups)
+    return [
+        {"text": g.upper(), "start": round(i * step, 3), "end": round((i + 1) * step, 3)}
+        for i, g in enumerate(groups)
+    ]
+
+
 def chunks_to_srt(chunks: list[dict], path: str) -> str:
     def ts(t: float) -> str:
         ms = int(t * 1000)

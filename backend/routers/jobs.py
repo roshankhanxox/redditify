@@ -171,6 +171,9 @@ def _sanitize_settings(s: dict) -> dict:
     # Render customizations — enums are whitelisted and ints clamped here so
     # nothing but known-safe values can ever reach libass/PIL/ffmpeg.
     out["captions_enabled"] = _to_bool(s.get("captions_enabled"), True)
+    mode = s.get("caption_mode")
+    out["caption_mode"] = mode if mode in ("synced", "static") else "synced"
+    out["caption_text"] = str(s.get("caption_text") or "").strip()[:600]
     out["caption_font_size"] = _clamp_int(s, "caption_font_size", 96, 48, 140)
     position = s.get("caption_position")
     out["caption_position"] = position if position in VALID_CAPTION_POSITIONS else "lower"
