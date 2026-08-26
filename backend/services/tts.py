@@ -52,10 +52,37 @@ VOICE_CATALOG: dict[str, dict] = {
     # are edge exclusives; premium requests route to the free engine.
     "prabhat":  {"label": "Prabhat · Indian Hinglish",        "el": None, "edge": "en-IN-PrabhatNeural"},
     "neerja":   {"label": "Neerja · Indian Hinglish",         "el": None, "edge": "en-IN-NeerjaNeural"},
+    # --- Accent roster (free engine only, from the edge-tts voice list) ---
+    # Curated English accents + Bangla. All verified live before entry.
+    "steffan":  {"label": "Steffan · American",               "el": None, "edge": "en-US-SteffanNeural"},
+    "michelle": {"label": "Michelle · American",              "el": None, "edge": "en-US-MichelleNeural"},
+    "thomas":   {"label": "Thomas · British",                 "el": None, "edge": "en-GB-ThomasNeural"},
+    "libby":    {"label": "Libby · British",                  "el": None, "edge": "en-GB-LibbyNeural"},
+    "connor":   {"label": "Connor · Irish",                   "el": None, "edge": "en-IE-ConnorNeural"},
+    "emily":    {"label": "Emily · Irish",                    "el": None, "edge": "en-IE-EmilyNeural"},
+    "chilemba": {"label": "Chilemba · Kenyan",                "el": None, "edge": "en-KE-ChilembaNeural"},
+    "asilia":   {"label": "Asilia · Kenyan",                  "el": None, "edge": "en-KE-AsiliaNeural"},
+    "abeo":     {"label": "Abeo · Nigerian",                  "el": None, "edge": "en-NG-AbeoNeural"},
+    "ezinne":   {"label": "Ezinne · Nigerian",                "el": None, "edge": "en-NG-EzinneNeural"},
+    "luke":     {"label": "Luke · South African",             "el": None, "edge": "en-ZA-LukeNeural"},
+    "leah":     {"label": "Leah · South African",             "el": None, "edge": "en-ZA-LeahNeural"},
+    "pradeep":  {"label": "Pradeep · Bangla",                 "el": None, "edge": "bn-BD-PradeepNeural"},
+    "nabanita": {"label": "Nabanita · Bangla",                "el": None, "edge": "bn-BD-NabanitaNeural"},
 }
 
 VALID_TTS_PROVIDERS = ("auto", "elevenlabs", "edge")
 VALID_EXPRESSIVENESS = ("natural", "expressive", "dramatic")
+VALID_VOICE_PERSONALITIES = ("none", "friendly", "hype", "calm", "serious")
+
+# Delivery personality presets (free engine): rate/pitch deltas layered on
+# top of the user's speed and the expressiveness contour.
+_EDGE_PERSONALITY = {
+    "none":     {"rate": 0,   "pitch": 0},
+    "friendly": {"rate": -2,  "pitch": 8},
+    "hype":     {"rate": 10,  "pitch": 22},
+    "calm":     {"rate": -8,  "pitch": -12},
+    "serious":  {"rate": -4,  "pitch": -6},
+}
 
 # Expressiveness -> ElevenLabs voice_settings. Lower stability lets the model
 # swing harder between calm and tense; style exaggerates delivery.
@@ -102,15 +129,21 @@ def _elevenlabs(text: str, voice: str, path: str, speed: float = 1.0,
 
 
 async def _edge(text: str, voice: str, path: str, speed: float = 1.0,
-                expressiveness: str = "expressive") -> str:
+                expressiveness: str = "expressive", personality: str = "none") -> str:
     edge_voice = VOICE_CATALOG.get(voice, {}).get("edge") or VOICE_CATALOG["daniel"]["edge"]
-    base_rate = int(round((speed - 1.0) * 100))
+    pers = _EDGE_PERSONALITY.get(personality, _EDGE_PERSONALITY["none"])
+    base_rate = int(round((speed - 1.0) * 100)) + pers["rate"]
+    base_pitch = pers["pitch"]
     contour = _EDGE_CONTOUR.get(expressiveness, _EDGE_CONTOUR["expressive"])
     sentences = _split_sentences(text)
 
     # Single flat pass when there is nothing to modulate.
     if len(sentences) < 2 or (contour["pitch"] == 0 and contour["rate"] == 0):
-        communicate = edge_tts.Communicate(text, edge_voice, rate=f"{base_rate:+d}%")
+        communicate = edge_tts.Communicate(
+            text, edge_voice,
+            rate=f"{base_rate:+d}%",
+            pitch=f"{base_pitch:+d}Hz",
+        )
         await communicate.save(path)
         return path
 
@@ -132,7 +165,7 @@ async def _edge(text: str, voice: str, path: str, speed: float = 1.0,
             wave = 1 if i % 2 == 0 else -1
             ending = chunk_text.rstrip()[-1:]
             emphasis = 1.5 if ending in ("!", "?") else (0.6 if ending == "…" else 1.0)
-            pitch_hz = int(round(contour["pitch"] * wave * emphasis))
+            pitch_hz = int(round(contour["pitch"] * wave * emphasis)) + base_pitch
             rate_jitter = int(round(contour["rate"] * wave * emphasis))
             part_path = os.path.join(workdir, f"part-{i:04d}.mp3")
             communicate = edge_tts.Communicate(
@@ -167,20 +200,24 @@ def generate_voiceover(
     provider: str = "auto",
     speed: float = 1.0,
     expressiveness: str = "expressive",
+    personality: str = "none",
 ) -> str:
     """Synthesize speech. provider: 'auto' (ElevenLabs→edge fallback),
     'elevenlabs' (premium only, errors surface), or 'edge' (free only).
-    expressiveness shapes prosody: 'natural' | 'expressive' | 'dramatic'."""
+    expressiveness shapes prosody: 'natural' | 'expressive' | 'dramatic'.
+    personality layers a rate/pitch preset on the free engine."""
     speed = max(0.8, min(1.5, speed))
     if expressiveness not in VALID_EXPRESSIVENESS:
         expressiveness = "expressive"
+    if personality not in VALID_VOICE_PERSONALITIES:
+        personality = "none"
 
     entry = VOICE_CATALOG.get(voice, VOICE_CATALOG["daniel"])
 
     # Voices without a verified ElevenLabs id are free-engine exclusives —
     # never silently substitute another voice's premium render.
     if provider == "edge" or not entry.get("el"):
-        return asyncio.run(_edge(text, voice, output_path, speed, expressiveness))
+        return asyncio.run(_edge(text, voice, output_path, speed, expressiveness, personality))
 
     if provider == "elevenlabs":
         return _elevenlabs(text, voice, output_path, speed, expressiveness)

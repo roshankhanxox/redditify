@@ -94,6 +94,7 @@ def generate_reel(self, job_id: str):
                 provider=cfg.get("tts_provider", "auto"),
                 speed=cfg.get("speed", 1.1),
                 expressiveness=cfg.get("expressiveness", "expressive"),
+                personality=cfg.get("voice_personality", "none"),
             )
             storage.upload(audio_path, _scratch_key(job_id, "voice.mp3"), keep_local=True)
 

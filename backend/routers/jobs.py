@@ -14,7 +14,12 @@ from security import get_current_user
 from services.jobs import find_active_job
 from services.quota import check_quota, increment_quota
 from services.storage import presign_get, resolve
-from services.tts import VOICE_CATALOG, VALID_EXPRESSIVENESS, VALID_TTS_PROVIDERS
+from services.tts import (
+    VOICE_CATALOG,
+    VALID_EXPRESSIVENESS,
+    VALID_TTS_PROVIDERS,
+    VALID_VOICE_PERSONALITIES,
+)
 from services.scenes import DEFAULT_SCENE_ID, get_scene
 from services.fonts import get_font_path
 from tasks.render import generate_reel
@@ -152,6 +157,8 @@ def _sanitize_settings(s: dict) -> dict:
     out["retention"] = retention if retention in ("ephemeral", "retain") else "ephemeral"
     expressiveness = s.get("expressiveness")
     out["expressiveness"] = expressiveness if expressiveness in VALID_EXPRESSIVENESS else "expressive"
+    personality = s.get("voice_personality")
+    out["voice_personality"] = personality if personality in VALID_VOICE_PERSONALITIES else "none"
 
     # Template dispatch — scene/pitch only meaningful for the meme template.
     out["template"] = s.get("template") if s.get("template") in VALID_TEMPLATES else "story"
