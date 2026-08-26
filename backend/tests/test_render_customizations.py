@@ -410,3 +410,18 @@ class TestRenderMatrix:
 
     def test_neither_layer(self, media):
         self._render(media, "bare")
+
+
+class TestPreprocessText:
+    def test_story_keeps_reddit_intro(self):
+        from services.text import preprocess_text
+
+        out = preprocess_text("body text", context_label="r/AskReddit", title="AITA")
+        assert out.startswith("AITA. Posted in r/AskReddit. body text")
+
+    def test_meme_style_reads_verbatim(self):
+        from services.text import preprocess_text
+
+        out = preprocess_text("tumhe kya problem hai", context_label="", title="", max_words=50)
+        assert out == "tumhe kya problem hai"
+        assert "Posted in" not in out
