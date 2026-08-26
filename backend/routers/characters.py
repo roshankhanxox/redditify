@@ -104,45 +104,49 @@ async def init_character(
     return {"asset_id": str(asset_id), "url": presign_put(bg.source_key, 900, content_type)}
 
 
-def _process_sync(bg_id: uuid.UUID, user_id: uuid.UUID, db) -> UserBackground:
+def _process_sync(bg_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+    """Runs in a worker thread: opens its OWN sync session — the request's
+    AsyncSession must never be touched off the event loop."""
     from PIL import Image
 
-    bg = db.get(UserBackground, bg_id)
-    if bg is None or bg.user_id != user_id:
-        raise HTTPException(403, detail="Not your upload")
-    if bg.status != "pending":
-        raise HTTPException(409, detail="Upload already finalized")
-    src = resolve(bg.source_key)
-    if src is None:
-        raise HTTPException(404, detail="Upload not found — PUT did not complete")
-
-    with Image.open(src) as im:
-        im.load()
-        if getattr(im, "is_animated", False):
-            raise HTTPException(422, detail="Animated images are not supported")
-        has_alpha = im.mode in ("RGBA", "LA") or "transparency" in im.info
-        im = im.convert("RGBA" if has_alpha else "RGB")
-        if max(im.size) > 2048:
-            im.thumbnail((2048, 2048), Image.LANCZOS)
-
-        base_dir = bg.source_key.rsplit("/", 1)[0]
-        clip_key = f"{base_dir}/asset.webp"
-        out_dir = tempfile.mkdtemp(dir=tempfile.gettempdir())
-        out = os.path.join(out_dir, "asset.webp")
-        im.save(out, "WEBP", lossless=has_alpha, quality=90)
-
+    from sync_db import SyncSessionLocal
     from services.storage import upload as storage_upload
 
-    storage_upload(out, clip_key)
-    final_path = resolve(clip_key)
-    with Image.open(final_path) as fim:
-        bg.clip_key = clip_key
-        bg.resolution = f"{fim.width}x{fim.height}"
-    bg.file_size_bytes = os.path.getsize(final_path)
-    bg.status = "ready"
-    db.commit()
-    db.refresh(bg)
-    return bg
+    with SyncSessionLocal() as db:
+        bg = db.get(UserBackground, bg_id)
+        if bg is None or bg.user_id != user_id:
+            raise HTTPException(403, detail="Not your upload")
+        if bg.status != "pending":
+            raise HTTPException(409, detail="Upload already finalized")
+        src = resolve(bg.source_key)
+        if src is None:
+            raise HTTPException(404, detail="Upload not found — PUT did not complete")
+
+        with Image.open(src) as im:
+            im.load()
+            if getattr(im, "is_animated", False):
+                raise HTTPException(422, detail="Animated images are not supported")
+            has_alpha = im.mode in ("RGBA", "LA") or "transparency" in im.info
+            im = im.convert("RGBA" if has_alpha else "RGB")
+            if max(im.size) > 2048:
+                im.thumbnail((2048, 2048), Image.LANCZOS)
+
+            base_dir = bg.source_key.rsplit("/", 1)[0]
+            clip_key = f"{base_dir}/asset.webp"
+            out_dir = tempfile.mkdtemp(dir=tempfile.gettempdir())
+            out = os.path.join(out_dir, "asset.webp")
+            im.save(out, "WEBP", lossless=has_alpha, quality=90)
+
+        storage_upload(out, clip_key)
+        final_path = resolve(clip_key)
+        with Image.open(final_path) as fim:
+            bg.clip_key = clip_key
+            bg.resolution = f"{fim.width}x{fim.height}"
+        bg.file_size_bytes = os.path.getsize(final_path)
+        bg.status = "ready"
+        payload = _to_dict(bg)  # read while still attached — commit expires attrs
+        db.commit()
+        return payload
 
 
 @router.post("/characters/{asset_id}/complete")
@@ -153,8 +157,7 @@ async def complete_character(
 ):
     import asyncio
 
-    bg = await asyncio.to_thread(_process_sync, asset_id, user.id, db)
-    return _to_dict(bg)
+    return await asyncio.to_thread(_process_sync, asset_id, user.id)
 
 
 @router.get("/characters/{asset_id}/file")

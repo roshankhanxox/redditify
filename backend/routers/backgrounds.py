@@ -278,42 +278,49 @@ async def complete_image(
     mark ready. Sync on purpose — a few hundred ms, no worker round-trip."""
     import asyncio
 
-    return await asyncio.to_thread(_complete_image_sync, bg_id, user, db)
+    return await asyncio.to_thread(_complete_image_sync, bg_id, user.id)
 
 
-def _complete_image_sync(bg_id: uuid.UUID, user: User, db) -> dict:
+def _complete_image_sync(bg_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+    """Runs in a worker thread with its OWN sync session — never touch the
+    request's AsyncSession off the event loop."""
     from PIL import Image
 
-    bg = db.get(UserBackground, bg_id)
-    if bg is None or bg.user_id != user.id:
-        raise HTTPException(403, detail="Not your upload")
-    if bg.status != "pending":
-        raise HTTPException(409, detail="Upload already finalized")
-    src = storage.resolve(bg.source_key)
-    if src is None:
-        raise HTTPException(404, detail="Upload not found — PUT did not complete")
+    from sync_db import SyncSessionLocal
 
-    import tempfile
+    with SyncSessionLocal() as db:
+        bg = db.get(UserBackground, bg_id)
+        if bg is None or bg.user_id != user_id:
+            raise HTTPException(403, detail="Not your upload")
+        if bg.status != "pending":
+            raise HTTPException(409, detail="Upload already finalized")
+        src = storage.resolve(bg.source_key)
+        if src is None:
+            raise HTTPException(404, detail="Upload not found — PUT did not complete")
 
-    with Image.open(src) as im:
-        im.load()
-        if getattr(im, "is_animated", False):
-            raise HTTPException(422, detail="Animated images are not supported")
-        has_alpha = im.mode in ("RGBA", "LA") or "transparency" in im.info
-        im = im.convert("RGBA" if has_alpha else "RGB")
-        if max(im.size) > 2048:
-            im.thumbnail((2048, 2048), Image.LANCZOS)
+        import tempfile
 
-        base_dir = bg.source_key.rsplit("/", 1)[0]
-        clip_key = f"{base_dir}/asset.webp"
-        out = os.path.join(tempfile.mkdtemp(dir=tempfile.gettempdir()), "asset.webp")
-        im.save(out, "WEBP", lossless=has_alpha, quality=90)
+        with Image.open(src) as im:
+            im.load()
+            if getattr(im, "is_animated", False):
+                raise HTTPException(422, detail="Animated images are not supported")
+            has_alpha = im.mode in ("RGBA", "LA") or "transparency" in im.info
+            im = im.convert("RGBA" if has_alpha else "RGB")
+            if max(im.size) > 2048:
+                im.thumbnail((2048, 2048), Image.LANCZOS)
 
-    storage.upload(out, clip_key)
-    with Image.open(storage.resolve(clip_key)) as final_im:
-        bg.clip_key = clip_key
-        bg.resolution = f"{final_im.width}x{final_im.height}"
-    bg.status = "ready"
-    bg.file_size_bytes = os.path.getsize(storage.resolve(clip_key))
-    db.commit()
-    return _to_dict(bg)
+            base_dir = bg.source_key.rsplit("/", 1)[0]
+            clip_key = f"{base_dir}/asset.webp"
+            out = os.path.join(tempfile.mkdtemp(dir=tempfile.gettempdir()), "asset.webp")
+            im.save(out, "WEBP", lossless=has_alpha, quality=90)
+
+        storage.upload(out, clip_key)
+        final_path = storage.resolve(clip_key)
+        with Image.open(final_path) as final_im:
+            bg.clip_key = clip_key
+            bg.resolution = f"{final_im.width}x{final_im.height}"
+        bg.status = "ready"
+        bg.file_size_bytes = os.path.getsize(final_path)
+        payload = _to_dict(bg)  # read while attached — commit expires attrs
+        db.commit()
+        return payload
