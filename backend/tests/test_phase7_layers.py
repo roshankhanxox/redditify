@@ -123,6 +123,35 @@ class TestLayerSanitizer:
         })
         assert out["characters"] == [] and out["text_overlays"] == []
 
+    def test_character_rotation_clamped_and_defaulted(self):
+        out = _sanitize_settings({**self.BASE, "characters": [{
+            "asset_id": "11111111-1111-1111-1111-111111111111", "rotation": 750,
+        }]})
+        assert out["characters"][0]["rotation"] == 180
+        out = _sanitize_settings({**self.BASE, "characters": [
+            {"asset_id": "11111111-1111-1111-1111-111111111111"},
+        ]})
+        assert out["characters"][0]["rotation"] == 0  # pre-rotation jobs stay upright
+
+    def test_animated_scene_defaults_and_sanitized(self):
+        # New submissions default to a static frame; explicit values survive.
+        out = _sanitize_settings({"template": "meme", "scene_id": "rainbow"})
+        assert out["scene_animated"] is False
+        out = _sanitize_settings({
+            "template": "meme", "scene_id": "rainbow", "scene_animated": True,
+        })
+        assert out["scene_animated"] is True
+
+    def test_scene_background_motion_paths(self, tmp_path):
+        from services.video import scene_input_args
+
+        scene = scenes_service.get_scene("rainbow")
+        animated = scene_input_args(scene, 1.0, str(tmp_path), animated=True)
+        still = scene_input_args(scene, 1.0, str(tmp_path), animated=False)
+        assert "lavfi" in animated                      # live gradients source
+        assert "lavfi" not in still and "-loop" in still  # blended-still PNG loop
+        assert os.path.exists(os.path.join(str(tmp_path), "scene-rainbow.png"))
+
 
 # ---------------------------------------------------------------- rendering
 
@@ -178,5 +207,17 @@ class TestMemeLayeredRender:
             tmp_dir=str(tmp_path),
             characters=[{"path": character_png, "x": 0.25, "y": 0.5,
                          "scale": 0.2, "flip": True, "bob": False}],
+        )
+        assert os.path.exists(out)
+
+    def test_rotated_character_renders(self, audio, character_png, tmp_path):
+        scene = scenes_service.get_scene("candy")
+        out = str(tmp_path / "meme-rotated.mp4")
+        render_meme_video(
+            scene, audio, out,
+            tmp_dir=str(tmp_path),
+            characters=[{"path": character_png, "x": 0.5, "y": 0.5,
+                         "scale": 0.3, "flip": False, "bob": True,
+                         "rotation": -37.5}],
         )
         assert os.path.exists(out)

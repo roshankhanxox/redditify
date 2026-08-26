@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { DEFAULT_RENDER_SETTINGS, type RenderSettings } from "@/lib/types";
+import {
+  CAPTION_POSITION_Y,
+  DEFAULT_RENDER_SETTINGS,
+  type RenderSettings,
+} from "@/lib/types";
 
 export const DURATIONS = [
   { label: "~30s", words: 400 },
@@ -39,6 +43,7 @@ const renderSchema = z.object({
   captions_enabled: z.boolean(),
   caption_font_size: z.number().int().min(48).max(140),
   caption_position: z.enum(["lower", "center", "upper"]),
+  caption_y: z.number().min(0.05).max(0.95),
   caption_color: z.enum(["white", "yellow", "brand"]),
   caption_outline: z.number().int().min(0).max(12),
   caption_words: z.union([z.literal(1), z.literal(2), z.literal(3)]),
@@ -64,6 +69,7 @@ export const wizardSchema = z
     expressiveness: z.enum(["natural", "expressive", "dramatic"]),
     tts_pitch: z.number().int().min(-12).max(12),
     scene_id: z.string(),
+    scene_animated: z.boolean(),
     characters: z.array(z.object({
       asset_id: z.string(),
       x: z.number().min(0).max(1),
@@ -71,13 +77,14 @@ export const wizardSchema = z
       scale: z.number().min(0.05).max(0.9),
       flip: z.boolean(),
       bob: z.boolean(),
+      rotation: z.number().min(-180).max(180).optional(),
     })).max(3),
     text_overlays: z.array(z.object({
       text: z.string().min(1).max(140),
       font_id: z.string().min(1),
       x: z.number().min(0).max(1),
       y: z.number().min(0).max(1),
-      scale: z.number().min(0.1).max(0.95),
+      scale: z.number().min(0.02).max(0.98),
       color: z.string(),
       align: z.enum(["left", "center", "right"]),
     })).max(3),
@@ -126,6 +133,7 @@ export const DEFAULT_WIZARD_STATE: WizardState = {
   expressiveness: "expressive",
   tts_pitch: 0,
   scene_id: "rainbow",
+  scene_animated: true,
   characters: [],
   text_overlays: [],
   gameplay_category: "any",
@@ -135,12 +143,15 @@ export const DEFAULT_WIZARD_STATE: WizardState = {
   ...DEFAULT_RENDER_SETTINGS,
 };
 
-/** Meme defaults: captions carry the text, so the title card starts off. */
+/** Meme defaults: captions carry the text, so the title card starts off.
+ *  Gradient scenes default to a static frame — matches the fixed-background
+ *  reel style; flip "Background motion" to animate. */
 export const DEFAULT_MEME_STATE: WizardState = {
   ...DEFAULT_WIZARD_STATE,
   template: "meme",
   voice: "ana",
   tts_pitch: 5,
+  scene_animated: false,
   title_enabled: false,
 };
 
@@ -160,10 +171,12 @@ export const STEP_FIELDS: Record<(typeof STEPS)[number]["id"], string[]> = {
     "gameplay_source",
     "background_id",
     "scene_id",
+    "scene_animated",
     "retention",
     "captions_enabled",
     "caption_font_size",
     "caption_position",
+    "caption_y",
     "caption_color",
     "caption_outline",
     "caption_words",
@@ -182,6 +195,7 @@ export function buildPayload(s: WizardState) {
     captions_enabled: s.captions_enabled,
     caption_font_size: s.caption_font_size,
     caption_position: s.caption_position,
+    caption_y: s.caption_y,
     caption_color: s.caption_color,
     caption_outline: s.caption_outline,
     caption_words: s.caption_words as RenderSettings["caption_words"],
@@ -209,6 +223,7 @@ export function buildPayload(s: WizardState) {
         ? {
             template: "meme",
             scene_id: s.scene_id,
+            scene_animated: s.scene_animated,
             tts_pitch: s.tts_pitch,
             characters: s.characters,
             text_overlays: s.text_overlays,
@@ -281,6 +296,8 @@ export function stateFromJob(job: {
     text_overlays: Array.isArray(st.text_overlays) ? st.text_overlays : [],
     scene_id:
       typeof st.scene_id === "string" && st.scene_id ? st.scene_id : DEFAULT_WIZARD_STATE.scene_id,
+    // Jobs stored before the knob were rendered animated — restore that.
+    scene_animated: bool(st.scene_animated, true),
     tts_pitch: num(st.tts_pitch, 0, -12, 12),
     title: (job.title ?? "").slice(0, 300),
     subreddit:
@@ -303,6 +320,12 @@ export function stateFromJob(job: {
     captions_enabled: bool(st.captions_enabled, true),
     caption_font_size: num(st.caption_font_size, 96, 48, 140),
     caption_position: pick(st.caption_position, ["lower", "center", "upper"] as const, "lower"),
+    caption_y: num(
+      st.caption_y,
+      CAPTION_POSITION_Y[pick(st.caption_position, ["lower", "center", "upper"] as const, "lower")],
+      0.05,
+      0.95,
+    ),
     caption_color: pick(st.caption_color, ["white", "yellow", "brand"] as const, "white"),
     caption_outline: num(st.caption_outline, 6, 0, 12),
     caption_words: pick(st.caption_words, [1, 2, 3] as const, 2),
