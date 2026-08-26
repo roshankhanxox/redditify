@@ -99,16 +99,23 @@ def generate_reel(self, job_id: str):
 
         srt_path = os.path.join(tmp, "subs.ass")
         if captions_on and storage.download(_scratch_key(job_id, "subs.ass"), srt_path) is None:
-            set_status("TRANSCRIBING")
-            words = whisper_service.transcribe(voice_path)
-            try:
-                chunk_size = max(1, min(3, int(cfg.get("caption_words", 2))))
-            except (TypeError, ValueError):
-                chunk_size = 2
-            chunks = whisper_service.words_to_chunks(words, chunk_size=chunk_size)
             style = whisper_service.caption_style_from_settings(cfg)
-            whisper_service.chunks_to_ass(chunks, srt_path, style=style)
-            storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
+            chunk_size = max(1, min(3, int(cfg.get("caption_words", 2))))
+
+            static_text = str(cfg.get("caption_text") or "").strip()
+            if cfg.get("caption_mode") == "static" and static_text:
+                # Static mode: user-authored text, evenly sliced across the
+                # voiceover. Skips Whisper entirely — no transcription cost.
+                duration = video.get_duration(voice_path)
+                chunks = whisper_service.even_chunks(static_text, duration, chunk_size)
+            else:
+                set_status("TRANSCRIBING")
+                words = whisper_service.transcribe(voice_path)
+                chunks = whisper_service.words_to_chunks(words, chunk_size=chunk_size)
+
+            if chunks:
+                whisper_service.chunks_to_ass(chunks, srt_path, style=style)
+                storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
 
         card_path = os.path.join(tmp, "title.png")
         if title_on and storage.download(_scratch_key(job_id, "title.png"), card_path) is None:

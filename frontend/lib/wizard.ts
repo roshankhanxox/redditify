@@ -4,6 +4,7 @@ import {
   DEFAULT_RENDER_SETTINGS,
   type RenderSettings,
 } from "@/lib/types";
+import type { CaptionMode } from "@/lib/types";
 
 export const DURATIONS = [
   { label: "~30s", words: 400 },
@@ -41,6 +42,7 @@ export type TemplateId = (typeof TEMPLATES)[number]["id"];
 
 const renderSchema = z.object({
   captions_enabled: z.boolean(),
+  caption_mode: z.enum(["synced", "static"]),
   caption_font_size: z.number().int().min(48).max(140),
   caption_position: z.enum(["lower", "center", "upper"]),
   caption_y: z.number().min(0.05).max(0.95),
@@ -62,6 +64,8 @@ export const wizardSchema = z
     subreddit: z.string().trim().max(50).default(""),
     story: z.string().trim().min(1, "Paste a story first"),
     max_words: z.number().int().min(50).max(2000),
+    // Static-caption source text (caption_mode === "static")
+    caption_text: z.string().max(600),
     // Voice
     tts_provider: z.enum(["auto", "elevenlabs", "edge"]),
     voice: z.string().min(1),
@@ -127,6 +131,7 @@ export const DEFAULT_WIZARD_STATE: WizardState = {
   subreddit: "",
   story: "",
   max_words: DURATIONS[2].words,
+  caption_text: "",
   tts_provider: "auto",
   voice: "daniel",
   speed: 1.1,
@@ -174,6 +179,8 @@ export const STEP_FIELDS: Record<(typeof STEPS)[number]["id"], string[]> = {
     "scene_animated",
     "retention",
     "captions_enabled",
+    "caption_mode",
+    "caption_text",
     "caption_font_size",
     "caption_position",
     "caption_y",
@@ -193,6 +200,7 @@ export const STEP_FIELDS: Record<(typeof STEPS)[number]["id"], string[]> = {
 export function buildPayload(s: WizardState) {
   const render: RenderSettings = {
     captions_enabled: s.captions_enabled,
+    caption_mode: s.caption_mode,
     caption_font_size: s.caption_font_size,
     caption_position: s.caption_position,
     caption_y: s.caption_y,
@@ -211,6 +219,7 @@ export function buildPayload(s: WizardState) {
     speed: s.speed,
     expressiveness: s.expressiveness,
     ...render,
+    caption_text: s.caption_text,
     retention: s.retention,
     max_words: s.max_words,
   };
@@ -318,6 +327,8 @@ export function stateFromJob(job: {
     background_id: typeof st.background_id === "string" ? st.background_id : "",
     retention: pick(st.retention, ["ephemeral", "retain"] as const, "ephemeral"),
     captions_enabled: bool(st.captions_enabled, true),
+    caption_mode: pick(st.caption_mode, ["synced", "static"] as const, "synced"),
+    caption_text: typeof st.caption_text === "string" ? st.caption_text.slice(0, 600) : "",
     caption_font_size: num(st.caption_font_size, 96, 48, 140),
     caption_position: pick(st.caption_position, ["lower", "center", "upper"] as const, "lower"),
     caption_y: num(

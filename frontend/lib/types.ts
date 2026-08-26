@@ -1,10 +1,13 @@
 export type CaptionPosition = "lower" | "center" | "upper";
 export type CaptionColor = "white" | "yellow" | "brand";
+export type CaptionMode = "synced" | "static";
 export type TitlePosition = "top" | "bottom";
 export type TitleCardStyle = "dark" | "light" | "minimal";
 
 export interface RenderSettings {
   captions_enabled: boolean;
+  /** synced = Whisper word-synced; static = user text, evenly timed. */
+  caption_mode: CaptionMode;
   caption_font_size: number;
   caption_position: CaptionPosition;
   /** Normalized vertical center of the caption block [0.05..0.95]; maps to
@@ -29,6 +32,7 @@ export const CAPTION_POSITION_Y: Record<CaptionPosition, number> = {
 
 export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   captions_enabled: true,
+  caption_mode: "synced",
   caption_font_size: 96,
   caption_position: "lower",
   caption_y: CAPTION_POSITION_Y.lower,
