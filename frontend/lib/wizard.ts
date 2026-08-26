@@ -69,6 +69,7 @@ export const wizardSchema = z
     // Voice
     tts_provider: z.enum(["auto", "elevenlabs", "edge"]),
     voice: z.string().min(1),
+    voice_personality: z.enum(["none", "friendly", "hype", "calm", "serious"]),
     speed: z.number().min(0.8).max(1.5),
     expressiveness: z.enum(["natural", "expressive", "dramatic"]),
     tts_pitch: z.number().int().min(-12).max(12),
@@ -134,6 +135,7 @@ export const DEFAULT_WIZARD_STATE: WizardState = {
   caption_text: "",
   tts_provider: "auto",
   voice: "daniel",
+  voice_personality: "none",
   speed: 1.1,
   expressiveness: "expressive",
   tts_pitch: 0,
@@ -170,7 +172,7 @@ export const STEPS = [
 /** Fields validated when leaving each step (zod paths). */
 export const STEP_FIELDS: Record<(typeof STEPS)[number]["id"], string[]> = {
   content: ["title", "story"],
-  voice: ["tts_provider", "voice", "speed", "expressiveness", "tts_pitch"],
+  voice: ["tts_provider", "voice", "voice_personality", "speed", "expressiveness", "tts_pitch"],
   look: [
     "gameplay_category",
     "gameplay_source",
@@ -216,6 +218,7 @@ export function buildPayload(s: WizardState) {
   const base = {
     voice: s.voice,
     tts_provider: s.tts_provider,
+    voice_personality: s.voice_personality,
     speed: s.speed,
     expressiveness: s.expressiveness,
     ...render,
@@ -315,6 +318,11 @@ export function stateFromJob(job: {
     max_words: num(st.max_words, DURATIONS[2].words, 50, 2000),
     tts_provider: pick(st.tts_provider, ["auto", "elevenlabs", "edge"] as const, "auto"),
     voice: typeof st.voice === "string" ? st.voice : DEFAULT_WIZARD_STATE.voice,
+    voice_personality: pick(
+      st.voice_personality,
+      ["none", "friendly", "hype", "calm", "serious"] as const,
+      "none",
+    ),
     speed: num(st.speed, 1.1, 0.8, 1.5),
     expressiveness: pick(
       st.expressiveness,

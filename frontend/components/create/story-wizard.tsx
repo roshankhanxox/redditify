@@ -21,7 +21,7 @@ import type { CharacterAssetList } from "@/lib/types";
 import { LayerEditor } from "@/components/create/layer-editor";
 import { UserBackgroundPanel } from "@/components/background-picker";
 import type { AssetList } from "@/lib/types";
-import { VOICES, TTS_PROVIDERS } from "@/lib/voices";
+import { VOICES, VOICE_PERSONALITIES, TTS_PROVIDERS, type VoicePersonality } from "@/lib/voices";
 import {
   DEFAULT_MEME_STATE,
   DEFAULT_WIZARD_STATE,
@@ -221,6 +221,28 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
   const s = values;
   const err = errors as Record<string, { message?: string } | undefined>;
 
+  // Provider-aware voice list: Local TTS shows only free-engine voices;
+  // ElevenLabs hides them; Auto shows everything.
+  const visibleVoices =
+    s.tts_provider === "edge"
+      ? VOICES.filter((v) => v.edgeOnly)
+      : s.tts_provider === "elevenlabs"
+        ? VOICES.filter((v) => !v.edgeOnly)
+        : VOICES;
+  // A saved voice hidden by the provider switch would render with a
+  // different engine — snap the selection to a visible option instead.
+  const activeVoice = visibleVoices.some((v) => v.id === s.voice)
+    ? s.voice
+    : (visibleVoices[0]?.id ?? "daniel");
+
+  // Snap the stored voice into the visible list so the payload never ships a
+  // voice the chosen provider can't actually render.
+  useEffect(() => {
+    if (s.voice !== activeVoice) {
+      setValue("voice", activeVoice, { shouldDirty: true });
+    }
+  }, [s.voice, activeVoice, setValue]);
+
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_220px]">
       {/* Left — steps */}
@@ -301,26 +323,58 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                   </Row>
 
                   <Row label="Voice">
-                    <Select value={s.voice} onValueChange={(v) => setValue("voice", v, { shouldDirty: true })}>
+                    <Select
+                      value={activeVoice}
+                      onValueChange={(v) => setValue("voice", v, { shouldDirty: true })}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {["Male", "Female", "Neutral", "Kid"].map((group) => (
-                          <div key={group}>
-                            <p className="px-2 py-1 text-[13px] font-medium text-muted-foreground">
-                              {group}
-                            </p>
-                            {VOICES.filter((v) => v.group === group).map((v) => (
-                              <SelectItem key={v.id} value={v.id}>
-                                {v.label}
-                              </SelectItem>
-                            ))}
-                          </div>
-                        ))}
+                        {(["Male", "Female", "Neutral", "Kid"] as const)
+                          .map((group) => ({
+                            group,
+                            items: visibleVoices.filter((v) => v.group === group),
+                          }))
+                          .filter(({ items }) => items.length > 0)
+                          .map(({ group, items }) => (
+                            <div key={group}>
+                              <p className="px-2 py-1 text-[13px] font-medium text-muted-foreground">
+                                {group}
+                              </p>
+                              {items.map((v) => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  {v.label}
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-[13px] text-muted-foreground">
+                      {s.tts_provider === "edge"
+                        ? "Free engine — regional accents & Hinglish."
+                        : s.tts_provider === "elevenlabs"
+                          ? "Premium voices."
+                          : "Premium first, free-engine fallback."}
+                    </p>
                   </Row>
+
+                  {s.tts_provider !== "elevenlabs" && (
+                    <Row label="Personality" hint="Local TTS only">
+                      <Segmented
+                        value={(s.voice_personality ?? "none") as "none"}
+                        onChange={(v) =>
+                          setValue(
+                            "voice_personality",
+                            v as VoicePersonality,
+                            { shouldDirty: true },
+                          )
+                        }
+                        options={[...VOICE_PERSONALITIES]}
+                      />
+                    </Row>
+                  )}
 
                   <Row label="Speech speed" hint={`${s.speed.toFixed(2)}×`}>
                     <Slider

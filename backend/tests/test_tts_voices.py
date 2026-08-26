@@ -45,3 +45,43 @@ class TestHinglishVoices:
         monkeypatch.setattr(tts, "_edge", boom)
         out = tts.generate_voiceover("hello", "daniel", "/tmp/y.mp3", provider="auto")
         assert out == "/tmp/y.mp3"
+
+
+class TestAccentRoster:
+    def test_new_accent_ids_unique_and_edge_native(self):
+        ids = list(VOICE_CATALOG.keys())
+        assert len(ids) == len(set(ids))
+        for vid in ("steffan", "michelle", "thomas", "libby", "connor", "emily",
+                    "chilemba", "asilia", "abeo", "ezinne", "luke", "leah",
+                    "pradeep", "nabanita"):
+            entry = VOICE_CATALOG[vid]
+            assert entry["el"] is None, vid
+            assert entry["edge"], vid
+
+    def test_personality_shapes_edge_prosody(self, monkeypatch):
+        from services import tts
+
+        captured = {}
+
+        class FakeCommunicate:
+            def __init__(self, text, voice, rate=None, pitch=None):
+                captured.update(rate=rate, pitch=pitch)
+
+            async def save(self, path):
+                return path
+
+        monkeypatch.setattr(tts.edge_tts, "Communicate", FakeCommunicate)
+        tts.generate_voiceover(
+            "one line.", "prabhat", "/tmp/p.mp3",
+            provider="edge", personality="hype",
+        )
+        assert captured["rate"].startswith("+")
+        assert captured["pitch"] == "+22Hz"
+
+    def test_sanitize_personality(self):
+        from routers.jobs import _sanitize_settings
+
+        out = _sanitize_settings({"voice_personality": "HYPE"})
+        assert out["voice_personality"] == "none"  # unknown → none
+        out = _sanitize_settings({"voice_personality": "calm"})
+        assert out["voice_personality"] == "calm"
