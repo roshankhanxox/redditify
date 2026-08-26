@@ -43,6 +43,7 @@ export type TemplateId = (typeof TEMPLATES)[number]["id"];
 const renderSchema = z.object({
   captions_enabled: z.boolean(),
   caption_mode: z.enum(["synced", "static"]),
+  caption_layout: z.enum(["chunks", "block"]),
   caption_font_size: z.number().int().min(48).max(140),
   caption_position: z.enum(["lower", "center", "upper"]),
   caption_y: z.number().min(0.05).max(0.95),
@@ -182,6 +183,7 @@ export const STEP_FIELDS: Record<(typeof STEPS)[number]["id"], string[]> = {
     "retention",
     "captions_enabled",
     "caption_mode",
+    "caption_layout",
     "caption_text",
     "caption_font_size",
     "caption_position",
@@ -203,6 +205,7 @@ export function buildPayload(s: WizardState) {
   const render: RenderSettings = {
     captions_enabled: s.captions_enabled,
     caption_mode: s.caption_mode,
+    caption_layout: s.caption_layout,
     caption_font_size: s.caption_font_size,
     caption_position: s.caption_position,
     caption_y: s.caption_y,
@@ -223,6 +226,7 @@ export function buildPayload(s: WizardState) {
     expressiveness: s.expressiveness,
     ...render,
     caption_text: s.caption_text,
+    caption_layout: s.caption_layout,
     retention: s.retention,
     max_words: s.max_words,
   };
@@ -336,6 +340,7 @@ export function stateFromJob(job: {
     retention: pick(st.retention, ["ephemeral", "retain"] as const, "ephemeral"),
     captions_enabled: bool(st.captions_enabled, true),
     caption_mode: pick(st.caption_mode, ["synced", "static"] as const, "synced"),
+    caption_layout: pick(st.caption_layout, ["chunks", "block"] as const, "chunks"),
     caption_text: typeof st.caption_text === "string" ? st.caption_text.slice(0, 600) : "",
     caption_font_size: num(st.caption_font_size, 96, 48, 140),
     caption_position: pick(st.caption_position, ["lower", "center", "upper"] as const, "lower"),

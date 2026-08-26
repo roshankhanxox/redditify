@@ -108,6 +108,36 @@ def even_chunks(text: str, duration: float, words_per_screen: int = 2) -> list[d
     ]
 
 
+# Full-screen block layout: uppercase glyph ≈ 0.55×fontsize wide (Arial),
+# line box ≈ 1.2×fontsize tall; keep inside 980px width / 1100px height.
+_BLOCK_MAX_W = 980
+_BLOCK_MAX_H = 1100
+
+
+def static_block(text: str, duration: float, words_per_line: int = 4,
+                 base_fontsize: int = 96) -> list[dict]:
+    """Whole text as ONE caption event spanning the full duration, word-wrapped
+    to `words_per_line` per line and auto-fitted with an inline {\\fs} override
+    so libass shrinks the block instead of overflowing the frame."""
+    words = text.split()
+    if not words or duration <= 0:
+        return []
+    wpl = max(1, min(6, int(words_per_line)))
+    lines = [" ".join(words[i : i + wpl]) for i in range(0, len(words), wpl)]
+    longest = max(len(line) for line in lines)
+
+    fs = max(28, min(140, int(base_fontsize)))
+    fs = min(fs, int(_BLOCK_MAX_W / (longest * 0.55)))
+    fs = min(fs, int(_BLOCK_MAX_H / (len(lines) * 1.2)))
+    fs = max(24, fs)
+
+    return [{
+        "text": f"{{\\fs{fs}}}" + "\n".join(line.upper() for line in lines),
+        "start": 0.0,
+        "end": round(duration, 3),
+    }]
+
+
 def chunks_to_srt(chunks: list[dict], path: str) -> str:
     def ts(t: float) -> str:
         ms = int(t * 1000)

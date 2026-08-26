@@ -11,7 +11,7 @@ import {
   type CharacterPlacement,
   type TextPlacement,
 } from "@/lib/placement";
-import type { CaptionColor, CaptionMode, CaptionPosition } from "@/lib/types";
+import type { CaptionColor, CaptionLayout, CaptionMode, CaptionPosition } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,10 +48,12 @@ export interface CaptionPreview {
   words: 1 | 2 | 3;
   position: CaptionPosition;
   mode?: CaptionMode;
+  layout?: CaptionLayout;
   text?: string;
   onChange?: (enabled: boolean) => void;
   onYChange?: (y: number) => void;
   onModeChange?: (mode: CaptionMode) => void;
+  onLayoutChange?: (layout: CaptionLayout) => void;
   onTextChange?: (text: string) => void;
 }
 
@@ -766,7 +768,9 @@ export function LayerEditor({
               words={captions.words}
               sample={
                 captions.mode === "static" && (captions.text ?? "").trim()
-                  ? (captions.text ?? "").trim().split(/\s+/).slice(0, captions.words).join(" ")
+                  ? (captions.layout ?? "chunks") === "block"
+                    ? (captions.text ?? "").trim()
+                    : (captions.text ?? "").trim().split(/\s+/).slice(0, captions.words * 2).join(" ")
                   : undefined
               }
               draggable={!!captions.onYChange}
@@ -807,6 +811,16 @@ export function LayerEditor({
               />
               {captions.mode === "static" && (
                 <div className="flex flex-col gap-1">
+                  {captions.onLayoutChange && (
+                    <Segmented
+                      value={captions.layout ?? "chunks"}
+                      onChange={(v) => captions.onLayoutChange?.(v as CaptionLayout)}
+                      options={[
+                        { value: "chunks", label: "Timed chunks" },
+                        { value: "block", label: "Full screen" },
+                      ]}
+                    />
+                  )}
                   <Textarea
                     rows={3}
                     maxLength={600}
@@ -816,8 +830,9 @@ export function LayerEditor({
                     className="text-sm"
                   />
                   <p className="text-[13px] text-muted-foreground">
-                    Split into {captions.words}-word chunks, evenly spaced. No
-                    transcription runs.
+                    {(captions.layout ?? "chunks") === "block"
+                      ? `Whole text on one auto-fitted screen — ${captions.words} words per line.`
+                      : `Auto-split into ${captions.words}-word chunks, evenly timed.`}
                   </p>
                 </div>
               )}

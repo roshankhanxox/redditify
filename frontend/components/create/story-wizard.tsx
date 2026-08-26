@@ -409,6 +409,7 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                     value={{
                       captions_enabled: s.captions_enabled,
                       caption_mode: s.caption_mode,
+                      caption_layout: s.caption_layout,
                       caption_font_size: s.caption_font_size,
                       caption_position: s.caption_position,
                       caption_y: s.caption_y,
@@ -948,6 +949,7 @@ function MemeLookStep({
             words: watch("caption_words"),
             position: watch("caption_position"),
             mode: watch("caption_mode") ?? "synced",
+            layout: watch("caption_layout") ?? "chunks",
             text: watch("caption_text") ?? "",
             onChange: setCaptionsEnabled,
             onYChange: (v) =>
@@ -968,6 +970,7 @@ function MemeLookStep({
                 }
               }
             },
+            onLayoutChange: (v) => setValue("caption_layout", v, { shouldDirty: true }),
             onTextChange: (v) => setValue("caption_text", v, { shouldDirty: true }),
           }}
           onCharactersChange={(next) => setValue("characters", next, { shouldDirty: true })}

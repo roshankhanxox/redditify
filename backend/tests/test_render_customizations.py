@@ -224,6 +224,36 @@ class TestStaticCaptions:
             {"text": "HI THERE YOU", "start": 0.0, "end": 6.0},
         ]
 
+    def test_static_block_single_event_fitted(self):
+        import re
+
+        from services.whisper_service import static_block
+
+        text = "wait for it nobody expected this twist ending at all"
+        (chunk,) = static_block(text, 12.5, words_per_line=3, base_fontsize=96)
+        assert chunk["start"] == 0.0 and chunk["end"] == 12.5
+        m = re.match(r"\{\\fs(\d+)\}", chunk["text"])
+        assert m
+        fs = int(m.group(1))
+        lines = chunk["text"].split("\n", 1)[1].split("\n")
+        assert all(len(l.split()) <= 3 for l in lines)
+        longest = max(len(l) for l in lines)
+        assert fs * longest * 0.55 <= 980 + 25      # width budget respected
+        assert fs * len(lines) * 1.2 <= 1100 + 25   # height budget respected
+
+    def test_static_block_empty(self):
+        from services.whisper_service import static_block
+
+        assert static_block("", 10.0, 3) == []
+
+    def test_sanitize_caption_layout(self):
+        out = _sanitize_settings({"caption_layout": "BLOCK"})
+        assert out["caption_layout"] == "chunks"    # unknown → chunks
+        out = _sanitize_settings({"caption_layout": "block"})
+        assert out["caption_layout"] == "block"
+        out = _sanitize_settings({})
+        assert out["caption_layout"] == "chunks"
+
 
 # ---------------------------------------------------------------- title card
 

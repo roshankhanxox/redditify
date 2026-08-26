@@ -180,6 +180,8 @@ def _sanitize_settings(s: dict) -> dict:
     out["captions_enabled"] = _to_bool(s.get("captions_enabled"), True)
     mode = s.get("caption_mode")
     out["caption_mode"] = mode if mode in ("synced", "static") else "synced"
+    layout = s.get("caption_layout")
+    out["caption_layout"] = layout if layout in ("chunks", "block") else "chunks"
     out["caption_text"] = str(s.get("caption_text") or "").strip()[:600]
     out["caption_font_size"] = _clamp_int(s, "caption_font_size", 96, 48, 140)
     position = s.get("caption_position")
