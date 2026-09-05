@@ -157,7 +157,7 @@ def analyse_and_clip(self, clip_job_id: str):
                         if caption_animation == "karaoke":
                             result = whisper_service.words_to_karaoke_ass(
                                 clip_words, subs_path, style=style,
-                                chunk_size=2,
+                                chunk_size=3,  # 3 words keeps inactive context visible
                                 highlight=caption_highlight,
                             )
                             if not result:

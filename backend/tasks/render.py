@@ -167,7 +167,7 @@ def generate_reel(self, job_id: str):
                 if cfg.get("caption_animation") == "karaoke":
                     result = whisper_service.words_to_karaoke_ass(
                         words, srt_path, style=style,
-                        chunk_size=chunk_size,
+                        chunk_size=3,  # 3 words keeps inactive context visible
                         highlight=cfg.get("caption_highlight_color", "yellow"),
                     )
                     if result:
