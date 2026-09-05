@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     FREE_MONTHLY_LIMIT: int = 30
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
 
+    # LLM provider for clip analysis (anthropic | openai | groq)
+    LLM_PROVIDER: str = "anthropic"
+    ANTHROPIC_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    LLM_MODEL_ANTHROPIC: str = "claude-sonnet-4-6"
+    LLM_MODEL_OPENAI: str = "gpt-4o"
+    LLM_MODEL_GROQ: str = "llama-3.3-70b-versatile"
+    MAX_CLIPS_PER_JOB: int = 10
+
     class Config:
         env_file = os.path.join(os.path.dirname(__file__), ".env")
 

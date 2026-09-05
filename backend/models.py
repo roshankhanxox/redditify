@@ -76,6 +76,43 @@ class UserBackground(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
 
+class ClipJob(Base):
+    """One analysis + batch-clip job per user video upload."""
+
+    __tablename__ = "clip_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    source_key: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    source_label: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="QUEUED")
+    settings: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    error_message: Mapped[str | None] = mapped_column(Text)
+    clip_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
+
+class Clip(Base):
+    """One extracted short-form clip within a ClipJob."""
+
+    __tablename__ = "clips"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("clip_jobs.id", ondelete="CASCADE"), nullable=False)
+    index: Mapped[int] = mapped_column(Integer, nullable=False)
+    start_seconds: Mapped[float] = mapped_column(Float, nullable=False)
+    end_seconds: Mapped[float] = mapped_column(Float, nullable=False)
+    hook: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    engagement_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    clip_type: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    result_key: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    duration_seconds: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class QuotaUsage(Base):
     __tablename__ = "quota_usage"
 

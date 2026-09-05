@@ -187,6 +187,26 @@ def render_meme_video(
     return output_path
 
 
+def extract_clip(src: str, dst: str, start: float, duration: float) -> str:
+    """Extract a segment from src into dst.
+
+    Uses re-encode (not stream copy) to guarantee clean keyframes at the exact
+    cut points — stream copy can only cut at existing keyframes which may be
+    several seconds away from the target timestamp.
+    """
+    run_ffmpeg([
+        "-ss", f"{max(0.0, start):.3f}",
+        "-i", src,
+        "-t", f"{duration:.3f}",
+        "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+        "-c:a", "aac", "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        dst,
+    ])
+    return dst
+
+
 def extract_thumbnail(src: str, dst: str, at_seconds: float = 1.0) -> str:
     """Poster frame for dashboard cards: 270x480 JPG grabbed near at_seconds."""
     run_ffmpeg([
