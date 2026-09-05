@@ -264,7 +264,7 @@ async def init_image(
     )
     db.add(bg)
     await db.commit()
-    url = presign_put(bg.source_key, 900, content_type)
+    url = storage.presign_put(bg.source_key, 900, content_type)
     return {"id": str(bg_id), "url": url}
 
 

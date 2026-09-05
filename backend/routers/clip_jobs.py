@@ -19,6 +19,7 @@ from config import settings
 from db import get_db
 from models import Clip, ClipJob, User, UserBackground
 from security import get_current_user
+from services.quota import check_clip_quota, increment_clip_quota
 from services.storage import presign_get, resolve as storage_resolve, delete as storage_delete
 
 router = APIRouter(tags=["clip-jobs"])
@@ -121,7 +122,7 @@ def _sanitize_clip_settings(s: dict) -> dict:
     return out
 
 
-@router.post("/clip-jobs")
+@router.post("/clip-jobs", dependencies=[Depends(check_clip_quota)])
 async def create_clip_job(
     body: ClipJobCreate,
     user: User = Depends(get_current_user),
@@ -158,6 +159,7 @@ async def create_clip_job(
 
     from tasks.clip import analyse_and_clip
     analyse_and_clip.delay(str(job.id))
+    await increment_clip_quota(user.id)
 
     return {"clip_job_id": str(job.id)}
 
