@@ -1,7 +1,7 @@
 """Add clip_jobs and clips tables for the content engine."""
 
 revision = "f1a2b3c4d5e6"
-down_revision = "e9f0a1b2c3d4"
+down_revision = "b4c5d6e7f8a9"
 branch_labels = None
 depends_on = None
 
