@@ -433,6 +433,8 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                       caption_color: s.caption_color,
                       caption_outline: s.caption_outline,
                       caption_words: s.caption_words,
+                      caption_animation: s.caption_animation,
+                      caption_highlight_color: s.caption_highlight_color,
                       title_enabled: s.title_enabled,
                       title_position: s.title_position,
                       title_scale: s.title_scale,
