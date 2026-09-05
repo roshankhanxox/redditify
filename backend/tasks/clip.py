@@ -89,10 +89,12 @@ def analyse_and_clip(self, clip_job_id: str):
 
         logger.info("ClipJob %s: %d clip windows selected", clip_job_id, len(clip_windows))
 
-        # 5. Create Clip rows (pending) so the frontend can poll progress
+        # 5. Create Clip rows (pending) so the frontend can poll progress.
+        # Capture the generated ids up front so the render loop never re-queries.
+        clip_ids: list[str] = []
         with SyncSessionLocal() as db:
-            for i, w in enumerate(clip_windows):
-                clip = Clip(
+            rows = [
+                Clip(
                     job_id=uuid.UUID(clip_job_id),
                     index=i,
                     start_seconds=w.start,
@@ -103,7 +105,11 @@ def analyse_and_clip(self, clip_job_id: str):
                     clip_type=w.clip_type,
                     status="pending",
                 )
-                db.add(clip)
+                for i, w in enumerate(clip_windows)
+            ]
+            db.add_all(rows)
+            db.flush()  # populate server-default ids while still attached
+            clip_ids = [str(r.id) for r in rows]
             db.commit()
 
         # 6. Extract + transcode + caption each clip
@@ -121,41 +127,28 @@ def analyse_and_clip(self, clip_job_id: str):
         for i, w in enumerate(clip_windows):
             clip_tmp = os.path.join(tmp, f"clip_{i}")
             os.makedirs(clip_tmp, exist_ok=True)
-
-            with SyncSessionLocal() as db:
-                clip_row = db.scalars(
-                    __import__("sqlalchemy", fromlist=["select"]).select(Clip)
-                    .where(Clip.job_id == uuid.UUID(clip_job_id), Clip.index == i)
-                ).first()
-                clip_id = str(clip_row.id) if clip_row else None
+            clip_id = clip_ids[i]
 
             try:
                 duration = w.end - w.start
 
-                # Extract raw segment (original aspect, original audio)
-                raw_path = os.path.join(clip_tmp, "raw.mp4")
-                video.extract_clip(video_path, raw_path, w.start, duration)
-
-                # Transcode to 9:16 vertical (no audio — keep separate)
-                vertical_path = os.path.join(clip_tmp, "vertical.mp4")
-                video.transcode_vertical(raw_path, vertical_path)
-
-                # Extract audio from the raw clip for caption sync
-                clip_audio_path = os.path.join(clip_tmp, "clip_audio.mp3")
-                video.run_ffmpeg([
-                    "-i", raw_path,
-                    "-vn", "-acodec", "libmp3lame", "-q:a", "2",
-                    clip_audio_path,
-                ])
-
-                # Captions: slice Whisper words to this clip's time window
+                # Captions: slice Whisper words to this clip's window. Keep any word
+                # that OVERLAPS the window (not only fully-contained ones) and clamp
+                # its timing into [0, duration] so the first/last spoken word isn't
+                # dropped at the cut boundary (review.md R8). Offsets are relative to
+                # the clip start, which matches the single-pass input-seek timeline.
                 subs_path = None
                 if captions_on:
-                    clip_words = [
-                        {**word, "start": word["start"] - w.start, "end": word["end"] - w.start}
-                        for word in words
-                        if word.get("start", 0.0) >= w.start and word.get("end", 0.0) <= w.end
-                    ]
+                    clip_words = []
+                    for word in words:
+                        ws, we = word.get("start", 0.0), word.get("end", 0.0)
+                        if we <= w.start or ws >= w.end:
+                            continue  # no overlap
+                        clip_words.append({
+                            **word,
+                            "start": max(0.0, ws - w.start),
+                            "end": min(duration, we - w.start),
+                        })
                     if clip_words:
                         style = whisper_service.caption_style_from_settings(caption_style_cfg)
                         chunks = whisper_service.words_to_chunks(clip_words, chunk_size=2)
@@ -163,34 +156,34 @@ def analyse_and_clip(self, clip_job_id: str):
                             subs_path = os.path.join(clip_tmp, "subs.ass")
                             whisper_service.chunks_to_ass(chunks, subs_path, style=style)
 
-                # Composite: vertical video + original audio + captions
+                # Single-pass: seek + trim + 9:16 crop + caption burn + source audio.
                 output_path = os.path.join(clip_tmp, "output.mp4")
-                _render_clip_composite(vertical_path, clip_audio_path, output_path, subs_path)
+                video.render_clip(video_path, output_path, w.start, duration, subs=subs_path)
 
                 # Upload
                 result_key = f"users/{user_id}/clips/{clip_job_id}/{i}.mp4"
-                storage.upload(output_path, result_key)
-                clip_duration = video.get_duration(
-                    storage.resolve(result_key) or output_path
-                )
+                storage.upload(output_path, result_key, keep_local=True)
+                clip_duration = video.get_duration(output_path)
 
-                # Thumbnail
+                # Thumbnail — grabbed from the source at the clip's offset (no raw
+                # intermediate exists anymore in the single-pass flow).
                 try:
                     thumb_path = os.path.join(clip_tmp, "thumb.jpg")
-                    video.extract_thumbnail(raw_path, thumb_path, at_seconds=min(1.0, duration * 0.1))
+                    video.extract_thumbnail(
+                        video_path, thumb_path, at_seconds=w.start + min(1.0, duration * 0.1)
+                    )
                     storage.upload(thumb_path, f"users/{user_id}/clips/{clip_job_id}/{i}_thumb.jpg")
                 except Exception as exc:
                     logger.warning("Clip %d thumbnail failed: %s", i, exc)
 
                 # Mark clip done
-                if clip_id:
-                    with SyncSessionLocal() as db:
-                        cr = db.get(Clip, uuid.UUID(clip_id))
-                        if cr:
-                            cr.status = "done"
-                            cr.result_key = result_key
-                            cr.duration_seconds = clip_duration
-                            db.commit()
+                with SyncSessionLocal() as db:
+                    cr = db.get(Clip, uuid.UUID(clip_id))
+                    if cr:
+                        cr.status = "done"
+                        cr.result_key = result_key
+                        cr.duration_seconds = clip_duration
+                        db.commit()
 
                 completed += 1
                 _set_status(clip_job_id, "CLIPPING", clip_count=completed)
@@ -198,12 +191,11 @@ def analyse_and_clip(self, clip_job_id: str):
 
             except Exception as exc:
                 logger.error("ClipJob %s: clip %d failed: %s", clip_job_id, i, exc)
-                if clip_id:
-                    with SyncSessionLocal() as db:
-                        cr = db.get(Clip, uuid.UUID(clip_id))
-                        if cr:
-                            cr.status = "failed"
-                            db.commit()
+                with SyncSessionLocal() as db:
+                    cr = db.get(Clip, uuid.UUID(clip_id))
+                    if cr:
+                        cr.status = "failed"
+                        db.commit()
             finally:
                 shutil.rmtree(clip_tmp, ignore_errors=True)
 
@@ -221,36 +213,3 @@ def analyse_and_clip(self, clip_job_id: str):
         raise
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
-
-
-def _render_clip_composite(vertical_path: str, audio_path: str, output_path: str, subs_path: str | None) -> str:
-    """Composite the 9:16 vertical video with the original audio and optional ASS captions."""
-    from services.video import run_ffmpeg, get_duration
-
-    duration = get_duration(audio_path)
-
-    inputs = [
-        "-stream_loop", "-1", "-t", f"{duration + 0.1:.3f}", "-i", vertical_path,
-        "-i", audio_path,
-    ]
-
-    if subs_path:
-        sub_escaped = subs_path.replace("\\", "/").replace(":", "\\:")
-        filter_str = f"[0:v]scale=1080:1920,setsar=1[bg];[bg]subtitles='{sub_escaped}'[vout]"
-    else:
-        filter_str = "[0:v]scale=1080:1920,setsar=1[vout]"
-
-    run_ffmpeg([
-        *inputs,
-        "-filter_complex", filter_str,
-        "-map", "[vout]",
-        "-map", "1:a",
-        "-t", f"{duration + 0.1:.3f}",
-        "-c:v", "libx264", "-crf", "18", "-preset", "fast",
-        "-c:a", "aac", "-b:a", "192k",
-        "-r", "30",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
-        output_path,
-    ])
-    return output_path
