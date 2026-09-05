@@ -233,6 +233,32 @@ async def delete_clip_job(
     return {"deleted": True}
 
 
+@router.delete("/clip-jobs/{job_id}/clips/{clip_id}")
+async def delete_clip(
+    job_id: uuid.UUID,
+    clip_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await _get_job_checked(job_id, user, db)
+    clip = await db.get(Clip, clip_id)
+    if clip is None or clip.job_id != job_id:
+        raise HTTPException(404, detail="Clip not found")
+
+    uid = str(job.user_id)
+    jid = str(job.id)
+
+    if clip.result_key:
+        storage_delete(clip.result_key)
+    storage_delete(f"users/{uid}/clips/{jid}/{clip.index}_thumb.jpg")
+
+    await db.delete(clip)
+    # Decrement job clip_count
+    job.clip_count = max(0, job.clip_count - 1)
+    await db.commit()
+    return {"deleted": True}
+
+
 @router.get("/clip-jobs/{job_id}/clips/{clip_id}/download")
 async def download_clip(
     job_id: uuid.UUID,
