@@ -167,9 +167,10 @@ def words_to_karaoke_ass(
         return f"{h}:{m:02}:{s:02}.{cs:02}"
 
     s = {**DEFAULT_CAPTION_STYLE, **(style or {})}
-    base_color = s["primary"]
-    hl_color = CAPTION_HIGHLIGHT_COLORS.get(highlight, CAPTION_HIGHLIGHT_COLORS["yellow"])
-    base_inline = _ass_inline_color(base_color)
+    # Inactive words are always white so the highlight colour pops regardless of
+    # what caption_color the user chose (yellow-on-yellow would be invisible).
+    base_inline = _ass_inline_color(CAPTION_COLOR_PRIMARY["white"])
+    hl_color    = CAPTION_HIGHLIGHT_COLORS.get(highlight, CAPTION_HIGHLIGHT_COLORS["yellow"])
     hl_inline   = _ass_inline_color(hl_color)
 
     style_line = (
