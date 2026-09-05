@@ -45,6 +45,7 @@ export function NewClipJobDialog({ open, onOpenChange, onCreated }: Props) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadPhase, setUploadPhase] = useState<"uploading" | "processing">("uploading");
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [karaokeEnabled, setKaraokeEnabled] = useState(false);
 
   const { data: bgData } = useSWR<UserBackgroundList>(
     open ? "/backgrounds?kind=video&per_page=50" : null,
@@ -89,7 +90,11 @@ export function NewClipJobDialog({ open, onOpenChange, onCreated }: Props) {
     try {
       const { data } = await api.post<{ clip_job_id: string }>("/clip-jobs", {
         background_id: selected,
-        settings: { captions_enabled: captionsEnabled },
+        settings: {
+          captions_enabled: captionsEnabled,
+          caption_animation: captionsEnabled && karaokeEnabled ? "karaoke" : "none",
+          caption_highlight_color: "yellow",
+        },
       });
       onCreated(data.clip_job_id);
       // Reset state for next open
@@ -204,28 +209,55 @@ export function NewClipJobDialog({ open, onOpenChange, onCreated }: Props) {
             )}
 
             {/* Caption toggle */}
-            <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2.5">
-              <div>
-                <p className="text-sm font-medium">Captions</p>
-                <p className="text-xs text-muted-foreground">
-                  Burn synced subtitles onto each clip
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCaptionsEnabled((v) => !v)}
-                className={cn(
-                  "relative h-5 w-9 rounded-full transition-colors",
-                  captionsEnabled ? "bg-primary" : "bg-muted",
-                )}
-              >
-                <span
+            <div className="rounded-lg border border-border/60">
+              <div className="flex items-center justify-between px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium">Captions</p>
+                  <p className="text-xs text-muted-foreground">
+                    Burn synced subtitles onto each clip
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCaptionsEnabled((v) => !v)}
                   className={cn(
-                    "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-                    captionsEnabled ? "translate-x-4" : "translate-x-0.5",
+                    "relative h-5 w-9 rounded-full transition-colors",
+                    captionsEnabled ? "bg-primary" : "bg-muted",
                   )}
-                />
-              </button>
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                      captionsEnabled ? "translate-x-4" : "translate-x-0.5",
+                    )}
+                  />
+                </button>
+              </div>
+              {captionsEnabled && (
+                <div className="flex items-center justify-between border-t border-border/60 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium">Karaoke style</p>
+                    <p className="text-xs text-muted-foreground">
+                      Word-by-word highlight pop
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setKaraokeEnabled((v) => !v)}
+                    className={cn(
+                      "relative h-5 w-9 rounded-full transition-colors",
+                      karaokeEnabled ? "bg-primary" : "bg-muted",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                        karaokeEnabled ? "translate-x-4" : "translate-x-0.5",
+                      )}
+                    />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

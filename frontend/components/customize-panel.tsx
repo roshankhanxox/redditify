@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { DEFAULT_RENDER_SETTINGS, CAPTION_POSITION_Y, type RenderSettings } from "@/lib/types";
+import { DEFAULT_RENDER_SETTINGS, CAPTION_POSITION_Y, type RenderSettings, type CaptionAnimation } from "@/lib/types";
 import { CAPTION_COLOR_HEX, PhoneFramePreview } from "@/components/create/phone-preview";
 
 interface SegmentedOption<T extends string> {
@@ -185,6 +185,44 @@ export function CustomizePanel({
               ]}
             />
           </div>
+
+          {/* Karaoke — only available for synced captions */}
+          {(!value.caption_mode || value.caption_mode === "synced") && (
+            <div className="flex flex-col gap-2">
+              <Label className="text-muted-foreground">Caption style</Label>
+              <Segmented
+                value={value.caption_animation ?? "none"}
+                onChange={(v) => onChange({ caption_animation: v as CaptionAnimation })}
+                options={[
+                  { value: "none", label: "Standard" },
+                  { value: "karaoke", label: "Karaoke" },
+                ]}
+              />
+              {value.caption_animation === "karaoke" && (
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[13px] text-muted-foreground">Highlight colour</span>
+                  <div className="flex gap-2">
+                    {(["white", "yellow", "brand"] as const).map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={`${c} highlight`}
+                        aria-pressed={value.caption_highlight_color === c}
+                        onClick={() => onChange({ caption_highlight_color: c })}
+                        className={cn(
+                          "size-6 cursor-pointer rounded-full border-2 transition-all",
+                          value.caption_highlight_color === c
+                            ? "scale-110 border-primary"
+                            : "border-transparent opacity-70 hover:opacity-100",
+                        )}
+                        style={{ backgroundColor: CAPTION_COLOR_HEX[c] }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 

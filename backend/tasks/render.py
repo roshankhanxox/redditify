@@ -163,11 +163,20 @@ def generate_reel(self, job_id: str):
             else:
                 set_status("TRANSCRIBING")
                 words = whisper_service.transcribe(voice_path)
-                chunks = whisper_service.words_to_chunks(words, chunk_size=chunk_size)
 
-                if chunks:
-                    whisper_service.chunks_to_ass(chunks, srt_path, style=style)
-                    storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
+                if cfg.get("caption_animation") == "karaoke":
+                    result = whisper_service.words_to_karaoke_ass(
+                        words, srt_path, style=style,
+                        chunk_size=chunk_size,
+                        highlight=cfg.get("caption_highlight_color", "yellow"),
+                    )
+                    if result:
+                        storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
+                else:
+                    chunks = whisper_service.words_to_chunks(words, chunk_size=chunk_size)
+                    if chunks:
+                        whisper_service.chunks_to_ass(chunks, srt_path, style=style)
+                        storage.upload(srt_path, _scratch_key(job_id, "subs.ass"), keep_local=True)
 
         card_path = os.path.join(tmp, "title.png")
         if title_on and storage.download(_scratch_key(job_id, "title.png"), card_path) is None:

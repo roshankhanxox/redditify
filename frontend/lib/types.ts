@@ -2,6 +2,7 @@ export type CaptionPosition = "lower" | "center" | "upper";
 export type CaptionColor = "white" | "yellow" | "brand";
 export type CaptionMode = "synced" | "static";
 export type CaptionLayout = "chunks" | "block";
+export type CaptionAnimation = "none" | "karaoke";
 export type TitlePosition = "top" | "bottom";
 export type TitleCardStyle = "dark" | "light" | "minimal";
 
@@ -21,6 +22,10 @@ export interface RenderSettings {
   caption_color: CaptionColor;
   caption_outline: number;
   caption_words: 1 | 2 | 3;
+  /** none = standard block captions; karaoke = word-by-word highlight pop. */
+  caption_animation: CaptionAnimation;
+  /** Highlight colour for the active word in karaoke mode. */
+  caption_highlight_color: CaptionColor;
   title_enabled: boolean;
   title_position: TitlePosition;
   title_scale: number;
@@ -46,6 +51,8 @@ export const DEFAULT_RENDER_SETTINGS: RenderSettings = {
   caption_color: "white",
   caption_outline: 6,
   caption_words: 2,
+  caption_animation: "none",
+  caption_highlight_color: "yellow",
   title_enabled: true,
   title_position: "top",
   title_scale: 100,
