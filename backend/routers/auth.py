@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import get_db
 from models import User
+from ratelimit import rate_limit
 from security import create_access_token, get_current_user, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -27,7 +28,11 @@ class ChangePasswordBody(BaseModel):
     new_password: str = Field(min_length=8)
 
 
-@router.post("/register", status_code=201)
+@router.post(
+    "/register",
+    status_code=201,
+    dependencies=[Depends(rate_limit("register", limit=3, window_seconds=3600))],
+)
 async def register(body: RegisterBody, db: AsyncSession = Depends(get_db)):
     existing = await db.scalar(select(User).where(User.email == body.email))
     if existing:
@@ -39,7 +44,10 @@ async def register(body: RegisterBody, db: AsyncSession = Depends(get_db)):
     return {"id": str(user.id), "email": user.email}
 
 
-@router.post("/login")
+@router.post(
+    "/login",
+    dependencies=[Depends(rate_limit("login", limit=10, window_seconds=60))],
+)
 async def login(body: LoginBody, db: AsyncSession = Depends(get_db)):
     user = await db.scalar(select(User).where(User.email == body.email))
     if user is None or not verify_password(body.password, user.password_hash):

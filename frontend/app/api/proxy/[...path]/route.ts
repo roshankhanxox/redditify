@@ -12,6 +12,13 @@ async function proxy(req: NextRequest, path: string[]) {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${session.backendToken}`,
   }
+  // Forward the real client IP so the backend rate limiter keys on it for
+  // unauthenticated routes (all proxied requests otherwise share the proxy IP).
+  const clientIp =
+    req.headers.get("x-forwarded-for") ||
+    req.headers.get("x-real-ip") ||
+    ""
+  if (clientIp) headers["X-Forwarded-For"] = clientIp
   if (!(req.method === "GET" || req.method === "HEAD")) {
     headers["Content-Type"] = req.headers.get("content-type") || "application/json"
   }

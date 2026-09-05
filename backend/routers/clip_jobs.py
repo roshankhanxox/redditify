@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from db import get_db
 from models import Clip, ClipJob, User, UserBackground
+from ratelimit import rate_limit
 from security import get_current_user
 from services.quota import check_clip_quota, increment_clip_quota
 from services.storage import presign_get, resolve as storage_resolve, delete as storage_delete
@@ -122,7 +123,13 @@ def _sanitize_clip_settings(s: dict) -> dict:
     return out
 
 
-@router.post("/clip-jobs", dependencies=[Depends(check_clip_quota)])
+@router.post(
+    "/clip-jobs",
+    dependencies=[
+        Depends(rate_limit("clip_create", limit=10, window_seconds=60)),
+        Depends(check_clip_quota),
+    ],
+)
 async def create_clip_job(
     body: ClipJobCreate,
     user: User = Depends(get_current_user),

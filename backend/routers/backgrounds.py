@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from db import get_db
 from models import User, UserBackground
+from ratelimit import rate_limit
 from security import get_current_user
 from services import storage
 from tasks.backgrounds import MAX_DURATION_SECONDS, MIN_DURATION_SECONDS
@@ -87,7 +88,10 @@ async def get_background(
     return _to_dict(bg)
 
 
-@router.post("/backgrounds/init")
+@router.post(
+    "/backgrounds/init",
+    dependencies=[Depends(rate_limit("upload_init", limit=20, window_seconds=3600))],
+)
 async def init_background(
     body: BackgroundInit,
     user: User = Depends(get_current_user),
@@ -235,7 +239,10 @@ class ImageInit(BaseModel):
     kind: str = Field(default="image")  # image | character
 
 
-@router.post("/backgrounds/image-init")
+@router.post(
+    "/backgrounds/image-init",
+    dependencies=[Depends(rate_limit("upload_init", limit=20, window_seconds=3600))],
+)
 async def init_image(
     body: ImageInit,
     user: User = Depends(get_current_user),
