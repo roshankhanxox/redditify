@@ -261,13 +261,19 @@ def _call_llm(llm, transcript: str, words: list[dict], video_duration: float) ->
         f"Video duration: {_fmt_ts(video_duration)}\n\n"
         f"Transcript:\n{transcript}"
     )
+    # Provider errors (auth, network, rate limit, SDK failures) intentionally
+    # propagate — the task surfaces them verbatim as the job's error_message
+    # rather than masking them as an empty result. Only a genuine parse failure
+    # is handled here, and it raises a distinct, actionable message.
+    raw = llm.complete(SYSTEM_PROMPT, user_msg)
+    logger.debug("LLM raw response length: %d chars", len(raw))
     try:
-        raw = llm.complete(SYSTEM_PROMPT, user_msg)
-        logger.debug("LLM raw response length: %d chars", len(raw))
         items = _parse_response(raw)
-    except (json.JSONDecodeError, Exception) as exc:
-        logger.error("LLM response parse failed: %s", exc)
-        return []
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.error("LLM output was not valid JSON (%s); first 500 chars: %r", exc, raw[:500])
+        raise RuntimeError(
+            "LLM returned unparseable output — retry, or switch LLM_PROVIDER."
+        ) from exc
 
     clips = []
     for item in items:

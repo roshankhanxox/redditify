@@ -11,6 +11,7 @@ from config import settings
 from db import get_db
 from models import Job, User, UserBackground
 from security import get_current_user
+from ratelimit import rate_limit
 from services.jobs import find_active_job
 from services.quota import check_quota, increment_quota
 from services.storage import presign_get, resolve
@@ -260,7 +261,13 @@ def job_to_dict(j: Job) -> dict:
     }
 
 
-@router.post("/jobs", dependencies=[Depends(check_quota)])
+@router.post(
+    "/jobs",
+    dependencies=[
+        Depends(rate_limit("job_create", limit=10, window_seconds=60)),
+        Depends(check_quota),
+    ],
+)
 async def create_job(
     body: JobCreate,
     user: User = Depends(get_current_user),

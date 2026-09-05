@@ -187,19 +187,36 @@ def render_meme_video(
     return output_path
 
 
-def extract_clip(src: str, dst: str, start: float, duration: float) -> str:
-    """Extract a segment from src into dst.
+def render_clip(src: str, dst: str, start: float, duration: float, subs: str | None = None) -> str:
+    """Single-pass clip render: seek + trim + 9:16 auto-crop + optional caption
+    burn, keeping the source's own audio. One decode, one encode.
 
-    Uses re-encode (not stream copy) to guarantee clean keyframes at the exact
-    cut points — stream copy can only cut at existing keyframes which may be
-    several seconds away from the target timestamp.
+    Input seeking (`-ss` before `-i`) resets output PTS to 0, so an ASS file whose
+    timings are relative to the clip start lines up without further offset. Audio
+    is mapped optionally (`0:a:0?`) so a silent source still renders.
+
+    Replaces the former extract→transcode_vertical→caption-burn chain, which
+    re-encoded each clip up to three times (see review.md R7).
     """
+    vf_parts = [
+        "scale=1080:1920:force_original_aspect_ratio=increase",
+        "crop=1080:1920",
+        "setsar=1",
+    ]
+    if subs:
+        # libass filter path escaping: backslashes → forward slashes, ':' escaped.
+        sub_path = subs.replace("\\", "/").replace(":", "\\:")
+        vf_parts.append(f"subtitles='{sub_path}'")
+
     run_ffmpeg([
         "-ss", f"{max(0.0, start):.3f}",
         "-i", src,
         "-t", f"{duration:.3f}",
-        "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+        "-vf", ",".join(vf_parts),
+        "-map", "0:v:0", "-map", "0:a:0?",
+        "-c:v", "libx264", "-crf", "18", "-preset", "veryfast",
         "-c:a", "aac", "-b:a", "192k",
+        "-r", "30",
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
         dst,

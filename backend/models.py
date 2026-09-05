@@ -17,6 +17,8 @@ class User(Base):
     role: Mapped[str] = mapped_column(Text, nullable=False, default="free")
     plan: Mapped[str] = mapped_column(Text, nullable=False, default="free")  # 'free' | 'premium'
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Bumped on password change so all previously-issued JWTs stop validating (audit A2).
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
