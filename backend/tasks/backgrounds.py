@@ -11,8 +11,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tasks.render import celery  # noqa: E402  (single shared Celery app/worker)
 
 
+# Gameplay background loops: short clips looped under a reel.
 MIN_DURATION_SECONDS = 30.0
-MAX_DURATION_SECONDS = 600.0
+MAX_LOOP_DURATION_SECONDS = 600.0
+# Clip-source videos: long-form content fed to the clip engine.
+# No upper cap — the clip analyser handles chunking for very long videos.
+MAX_CLIP_SOURCE_DURATION_SECONDS = 14400.0  # 4 hours
 
 
 @celery.task(bind=True, max_retries=1, default_retry_delay=30)
@@ -64,28 +68,53 @@ def process_background(self, background_id: str):
             raise RuntimeError("Uploaded file missing from storage")
 
         duration = video.get_duration(src)
-        video.get_resolution(src)  # raises ValueError when there is no video stream
+        width, height = video.get_resolution(src)  # raises ValueError when there is no video stream
+        resolution_str = f"{width}x{height}"
+
         if duration < MIN_DURATION_SECONDS:
             raise ValueError(f"Clip too short: {duration:.1f}s (minimum {MIN_DURATION_SECONDS:.0f}s)")
-        if duration > MAX_DURATION_SECONDS:
-            raise ValueError(f"Clip too long: {duration:.1f}s (maximum {MAX_DURATION_SECONDS:.0f}s)")
 
-        clip_local = video.transcode_vertical(src, os.path.join(tmp, "clip.mp4"))
-        preview_local = video.render_preview(src, os.path.join(tmp, "preview.mp4"))
+        # Long-form videos (> 10 min) are clip-source material, not gameplay loops.
+        # Skip the expensive vertical transcode — render_clip does the 9:16 crop
+        # itself at analysis time, and source_key is what the clip engine downloads.
+        is_clip_source = duration > MAX_LOOP_DURATION_SECONDS
 
-        storage.upload(clip_local, clip_key)
-        storage.upload(preview_local, preview_key)
+        if is_clip_source:
+            if duration > MAX_CLIP_SOURCE_DURATION_SECONDS:
+                raise ValueError(
+                    f"Video too long: {duration:.1f}s (maximum {MAX_CLIP_SOURCE_DURATION_SECONDS / 3600:.0f} hours)"
+                )
+            # Mark ready immediately using source as-is — no transcode needed.
+            meta = storage.stat(source_key) or {}
+            set_status(
+                "ready",
+                clip_key=source_key,
+                preview_key=None,
+                duration_seconds=round(duration, 2),
+                file_size_bytes=meta.get("size_bytes"),
+                resolution=resolution_str,
+                error_message=None,
+            )
+        else:
+            if duration > MAX_LOOP_DURATION_SECONDS:
+                raise ValueError(f"Clip too long: {duration:.1f}s (maximum {MAX_LOOP_DURATION_SECONDS:.0f}s)")
 
-        meta = storage.stat(source_key) or {}
-        set_status(
-            "ready",
-            clip_key=clip_key,
-            preview_key=preview_key,
-            duration_seconds=round(duration, 2),
-            file_size_bytes=meta.get("size_bytes"),
-            resolution="1080x1920",
-            error_message=None,
-        )
+            clip_local = video.transcode_vertical(src, os.path.join(tmp, "clip.mp4"))
+            preview_local = video.render_preview(src, os.path.join(tmp, "preview.mp4"))
+
+            storage.upload(clip_local, clip_key)
+            storage.upload(preview_local, preview_key)
+
+            meta = storage.stat(source_key) or {}
+            set_status(
+                "ready",
+                clip_key=clip_key,
+                preview_key=preview_key,
+                duration_seconds=round(duration, 2),
+                file_size_bytes=meta.get("size_bytes"),
+                resolution="1080x1920",
+                error_message=None,
+            )
 
     except Exception as exc:
         transient = isinstance(exc, (ConnectionError, TimeoutError))

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
@@ -189,6 +189,101 @@ function formatTimestamp(seconds: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+// ── Video player modal ───────────────────────────────────────────────────────
+
+function VideoPlayerModal({
+  jobId,
+  clip,
+  onClose,
+}: {
+  jobId: string;
+  clip: Clip;
+  onClose: () => void;
+}) {
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const blobRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    api
+      .get(`/clip-jobs/${jobId}/clips/${clip.id}/download`)
+      .then((res) => {
+        if (res.data?.url) {
+          // S3 / MinIO — backend returns a presigned URL; use it directly
+          setVideoSrc(res.data.url);
+        } else {
+          // Local storage — backend returned binary; re-fetch as blob
+          return api
+            .get<Blob>(`/clip-jobs/${jobId}/clips/${clip.id}/download`, {
+              responseType: "blob",
+            })
+            .then((blobRes) => {
+              const url = URL.createObjectURL(blobRes.data);
+              blobRef.current = url;
+              setVideoSrc(url);
+            });
+        }
+      })
+      .catch(() => setError(true))
+      .finally(() => setLoading(false));
+
+    return () => {
+      if (blobRef.current) URL.revokeObjectURL(blobRef.current);
+    };
+  }, [jobId, clip.id]);
+
+  // Close on backdrop click or Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex max-h-[90vh] w-full max-w-sm flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -right-3 -top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm hover:bg-white/20"
+        >
+          <X className="size-4" />
+        </button>
+        {loading && (
+          <div className="flex aspect-[9/16] items-center justify-center rounded-xl bg-muted">
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {error && (
+          <div className="flex aspect-[9/16] items-center justify-center rounded-xl bg-muted text-sm text-destructive">
+            Failed to load clip
+          </div>
+        )}
+        {videoSrc && (
+          <video
+            src={videoSrc}
+            controls
+            autoPlay
+            playsInline
+            className="max-h-[90vh] w-full rounded-xl object-contain"
+          />
+        )}
+        <p className="mt-3 text-center text-sm font-medium text-white/80 line-clamp-2">
+          {clip.hook}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Clip card ────────────────────────────────────────────────────────────────
 
 const DISMISS_DELAY_MS = 5000;
@@ -206,6 +301,7 @@ function ClipCard({
 }) {
   const [downloading, setDownloading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function handleDownload() {
@@ -246,6 +342,10 @@ function ClipCard({
   if (dismissed) return null;
 
   return (
+    <>
+    {playing && (
+      <VideoPlayerModal jobId={jobId} clip={clip} onClose={() => setPlaying(false)} />
+    )}
     <div className="group relative flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition-colors hover:border-border">
       {/* Thumbnail / preview area */}
       <div className="relative aspect-[9/16] w-full overflow-hidden bg-muted/40">
@@ -276,11 +376,14 @@ function ClipCard({
               </div>
             )}
             {/* Play overlay */}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/30 group-hover:opacity-100">
+            <button
+              onClick={() => setPlaying(true)}
+              className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/30 group-hover:opacity-100"
+            >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 shadow-lg">
                 <Play className="size-5 fill-current text-black" />
               </div>
-            </div>
+            </button>
           </>
         )}
 
@@ -356,6 +459,7 @@ function ClipCard({
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -365,6 +469,7 @@ const TERMINAL = ["DONE", "FAILED"];
 
 export default function ClipJobPage() {
   const { jobId } = useParams<{ jobId: string }>();
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   const { data: job, isLoading } = useSWR<ClipJob>(
     jobId ? `/clip-jobs/${jobId}` : null,
@@ -402,8 +507,6 @@ export default function ClipJobPage() {
       </div>
     );
   }
-
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   function handleClipDeleted(clipId: string) {
     setDeletedIds((prev) => new Set([...prev, clipId]));

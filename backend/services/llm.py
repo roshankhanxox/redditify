@@ -6,9 +6,26 @@ Groq is OpenAI-compatible — same SDK, different base_url + key.
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 
 from config import settings
+
+
+def _extract_content(content: str, reasoning_fallback: str | None = None) -> str:
+    """Normalise output from reasoning models.
+
+    Qwen/Groq reasoning models wrap their chain-of-thought in <think>…</think>
+    before the real answer; strip that block so the caller sees only the final
+    output. For openai/gpt-oss-* the content field is empty and the answer
+    lands in the SDK's `reasoning` attribute — use that as a fallback.
+    """
+    if content:
+        # Strip <think>…</think> blocks (may span multiple lines)
+        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+    if not content and reasoning_fallback:
+        content = reasoning_fallback.strip()
+    return content
 
 
 class LLMProvider(ABC):
@@ -51,7 +68,9 @@ class OpenAIProvider(LLMProvider):
             ],
             max_tokens=4096,
         )
-        return resp.choices[0].message.content or ""
+        msg = resp.choices[0].message
+        reasoning = getattr(msg, "reasoning", None)
+        return _extract_content(msg.content or "", reasoning)
 
 
 class GroqProvider(OpenAIProvider):

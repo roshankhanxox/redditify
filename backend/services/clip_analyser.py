@@ -213,8 +213,8 @@ def _validate_clip(c: dict, words: list[dict], video_duration: float) -> ClipWin
         clip_type = "story_peak"
 
     return ClipWindow(
-        start=round(start, 2),
-        end=round(end, 2),
+        start=float(round(start, 2)),
+        end=float(round(end, 2)),
         hook=str(c.get("hook", ""))[:300],
         reason=str(c.get("reason", ""))[:500],
         engagement_score=score,

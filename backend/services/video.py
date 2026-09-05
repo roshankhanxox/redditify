@@ -3,11 +3,17 @@ import subprocess
 
 
 def run_ffmpeg(args: list[str]) -> None:
-    """Run FFmpeg. Raises RuntimeError with full stderr on failure."""
+    """Run FFmpeg. Raises RuntimeError with full stderr on failure.
+
+    Uses Popen + active stderr drain instead of subprocess.run so that
+    macOS App Nap / process throttling does not suspend FFmpeg mid-encode
+    (the OS treats a blocked read as idle and sends SIGSTOP).
+    """
     cmd = ["ffmpeg", "-y"] + args
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg failed (exit {result.returncode}):\n{result.stderr}")
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    _, stderr_bytes = proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"FFmpeg failed (exit {proc.returncode}):\n{stderr_bytes.decode(errors='replace')}")
 
 
 def get_duration(path: str) -> float:
