@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftRight, CheckCircle2, Download, Loader2, MoreVertical, Trash2 } from "lucide-react";
+import { ArrowLeftRight, CheckCircle2, Clock, Download, Loader2, MoreVertical, Trash2 } from "lucide-react";
 import { downloadReel } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Job } from "@/lib/types";
@@ -88,6 +88,16 @@ function Media({ job }: { job: Job }) {
   // authenticated route, which lazily generates the preview and 302s.
   const [warmRetry, setWarmRetry] = useState(false);
 
+  // Expired: file gone, only the job row remains
+  if (job.status === "DONE" && !job.result_url) {
+    return (
+      <div className="relative flex aspect-[9/16] flex-col items-center justify-center gap-2 bg-muted/60">
+        <Clock className="size-5 text-muted-foreground/40" />
+        <span className="text-[11px] text-muted-foreground/50">Expired</span>
+      </div>
+    );
+  }
+
   if (job.status === "FAILED") {
     return (
       <div className="flex aspect-[9/16] items-center justify-center bg-destructive/5">
@@ -145,9 +155,30 @@ function Media({ job }: { job: Job }) {
     );
   }
 
+  // No thumbnail available — gradient placeholder with the reel title
+  return <ReelPlaceholder title={job.title} />;
+}
+
+function ReelPlaceholder({ title }: { title: string }) {
+  // Deterministic gradient hue from the title string so each reel gets its own colour
+  const hue = title.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
   return (
-    <div className="flex aspect-[9/16] items-center justify-center bg-muted">
-      <span className="text-[13px] text-muted-foreground/60">no preview</span>
+    <div
+      className="relative flex aspect-[9/16] w-full flex-col justify-end overflow-hidden p-3"
+      style={{
+        background: `linear-gradient(160deg, hsl(${hue} 30% 18%) 0%, hsl(${(hue + 40) % 360} 25% 10%) 100%)`,
+      }}
+    >
+      {/* Subtle texture lines */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 3px, white 3px, white 4px)`,
+        }}
+      />
+      <p className="relative line-clamp-4 text-[11px] font-medium leading-snug text-white/70">
+        {title}
+      </p>
     </div>
   );
 }
@@ -159,6 +190,7 @@ interface ReelActions {
 
 function ActionMenu({ job, actions }: { job: Job; actions: ReelActions }) {
   const playable = job.status === "DONE" && !!job.result_url;
+  const expired = job.status === "DONE" && !job.result_url;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -176,7 +208,7 @@ function ActionMenu({ job, actions }: { job: Job; actions: ReelActions }) {
           Open player
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={!playable}
+          disabled={!playable || expired}
           onSelect={() => downloadReel(job.id, `${job.title || "reel"}.mp4`)}
         >
           <Download />
@@ -223,12 +255,14 @@ function useDoneFlash(status: string): boolean {
 export function ReelCard({ job, actions }: { job: Job; actions: ReelActions }) {
   const justFinished = useDoneFlash(job.status);
   const processing = !TERMINAL.includes(job.status);
+  const expired = job.status === "DONE" && !job.result_url;
 
   return (
     <div
       className={cn(
         "group relative overflow-hidden rounded-lg border bg-card transition-colors hover:border-ring",
         processing && "border-brand/40",
+        expired && "opacity-60",
         justFinished && "ring-2 ring-emerald-500/70 border-emerald-500/50",
       )}
     >
@@ -238,7 +272,10 @@ export function ReelCard({ job, actions }: { job: Job; actions: ReelActions }) {
         onClick={() =>
           job.status === "DONE" && !!job.result_url && actions.onOpen(job)
         }
-        className="block w-full cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(
+          "block w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          expired ? "cursor-default" : "cursor-pointer",
+        )}
       >
         <Media job={job} />
       </button>

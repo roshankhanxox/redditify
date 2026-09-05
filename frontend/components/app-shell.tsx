@@ -9,6 +9,7 @@ import {
   House,
   LibraryBig,
   LogOut,
+  Scissors,
   ShieldUser,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -52,6 +53,7 @@ const CREATE_GROUP: NavItem[] = [
 
 const WORKSPACE_GROUP: NavItem[] = [
   { href: "/dashboard/reels", label: "My Reels", icon: LibraryBig },
+  { href: "/dashboard/clips", label: "Clip Engine", icon: Scissors },
   { href: "/dashboard/library", label: "Library", icon: FolderOpen },
 ];
 

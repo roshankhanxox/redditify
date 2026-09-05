@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import admin, assets, auth, backgrounds, characters, fonts, jobs, quota, scenes, stats
+from routers import admin, assets, auth, backgrounds, characters, clip_jobs, fonts, jobs, quota, scenes, stats
 
 
 @asynccontextmanager
@@ -31,6 +31,7 @@ app.include_router(fonts.router)
 app.include_router(characters.router)
 app.include_router(auth.router)
 app.include_router(jobs.router)
+app.include_router(clip_jobs.router)
 app.include_router(admin.router)
 
 

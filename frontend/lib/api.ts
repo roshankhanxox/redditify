@@ -185,6 +185,27 @@ export async function uploadCharacter(
   return api.post<CharacterAsset>(`/characters/${init.asset_id}/complete`).then((r) => r.data)
 }
 
+/* ------------------------------------------------------------------ */
+/* Content Engine — clip jobs                                          */
+/* ------------------------------------------------------------------ */
+
+export async function downloadClip(jobId: string, clipId: string, index: number) {
+  const res = await api.get<Blob>(`/clip-jobs/${jobId}/clips/${clipId}/download`, { responseType: "blob" })
+  if (res.data instanceof Blob && res.data.type === "application/json") {
+    const { url } = JSON.parse(await res.data.text()) as { url: string }
+    window.location.href = url
+    return
+  }
+  const objectUrl = URL.createObjectURL(res.data)
+  const anchor = document.createElement("a")
+  anchor.href = objectUrl
+  anchor.download = `clip_${index + 1}.mp4`
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
 export async function listCharacters() {
   return api.get<{ items: CharacterAsset[] }>("/characters").then((r) => r.data)
 }
