@@ -989,6 +989,10 @@ function MemeLookStep({
             onLayoutChange: (v) => setValue("caption_layout", v, { shouldDirty: true }),
             onScaleChange: (v) => setValue("caption_scale", v, { shouldDirty: true }),
             onTextChange: (v) => setValue("caption_text", v, { shouldDirty: true }),
+            animation: watch("caption_animation") ?? "none",
+            highlightColor: watch("caption_highlight_color") ?? "yellow",
+            onAnimationChange: (v) => setValue("caption_animation", v, { shouldDirty: true }),
+            onHighlightColorChange: (v) => setValue("caption_highlight_color", v, { shouldDirty: true }),
           }}
           onCharactersChange={(next) => setValue("characters", next, { shouldDirty: true })}
           onTextsChange={(next) => setValue("text_overlays", next, { shouldDirty: true })}
