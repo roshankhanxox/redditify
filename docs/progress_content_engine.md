@@ -7,21 +7,23 @@
 ## Checklist
 
 ### Backend
-- [ ] Config: LLM provider keys + model names
-- [ ] Models: ClipJob + Clip ORM
-- [ ] Alembic migration: clip_jobs + clips tables
-- [ ] services/llm.py: Anthropic / OpenAI / Groq provider interface
-- [ ] services/clip_analyser.py: engagement system prompt + LLM call + validation
-- [ ] services/video.py: extract_clip() function
-- [ ] tasks/clip.py: analyse_and_clip Celery task
-- [ ] routers/clip_jobs.py: REST API
-- [ ] main.py: register router
+- [x] Config: LLM provider keys + model names
+- [x] Models: ClipJob + Clip ORM
+- [x] Alembic migration: clip_jobs + clips tables
+- [x] services/llm.py: Anthropic / OpenAI / Groq provider interface
+- [x] services/clip_analyser.py: engagement system prompt + LLM call + validation
+- [x] services/video.py: extract_clip() function
+- [x] tasks/clip.py: analyse_and_clip Celery task
+- [x] routers/clip_jobs.py: REST API (incl. per-clip DELETE)
+- [x] main.py: register router
 
 ### Frontend
-- [ ] /dashboard/clips: clip jobs list page (production-grade UI)
-- [ ] /dashboard/clips/[jobId]: clip gallery + status poller
-- [ ] Nav: add Clips link to app shell
-- [ ] types.ts: ClipJob + Clip types
+- [x] /dashboard/clips: clip jobs list page (production-grade UI)
+- [x] /dashboard/clips/[jobId]: clip gallery + status poller + timed dismiss
+- [x] Nav: Clip Engine link added to app shell
+- [x] types.ts: ClipJob + Clip types
+- [x] api.ts: downloadClip helper
+- [x] NewClipJobDialog: pick from library or upload new video
 
 ---
 
@@ -29,7 +31,8 @@
 
 | Commit | Description |
 |--------|-------------|
-| — | — |
+| ef84879 | feat(content-engine): backend pipeline — LLM analyser, clip task, API routes, DB models |
+| e2ba5cb | feat(content-engine): frontend — clip engine pages, clip gallery, timed dismiss, nav |
 
 ---
 
