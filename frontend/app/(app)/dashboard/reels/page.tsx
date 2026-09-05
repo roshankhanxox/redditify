@@ -51,11 +51,16 @@ const fetcher = (url: string) => api.get(url).then((r) => r.data);
 
 const TERMINAL = ["DONE", "FAILED"];
 
+function isExpired(j: Job) {
+  return j.status === "DONE" && !j.result_url;
+}
+
 const FILTERS = [
-  { id: "all", label: "All", match: () => true },
-  { id: "processing", label: "Processing", match: (s: string) => !TERMINAL.includes(s) },
-  { id: "done", label: "Done", match: (s: string) => s === "DONE" },
-  { id: "failed", label: "Failed", match: (s: string) => s === "FAILED" },
+  { id: "all",        label: "All",        match: (j: Job) => !isExpired(j) },
+  { id: "processing", label: "Processing", match: (j: Job) => !isExpired(j) && !TERMINAL.includes(j.status) },
+  { id: "done",       label: "Done",       match: (j: Job) => !isExpired(j) && j.status === "DONE" },
+  { id: "failed",     label: "Failed",     match: (j: Job) => j.status === "FAILED" },
+  { id: "expired",    label: "Expired",    match: (j: Job) => isExpired(j) },
 ] as const;
 
 type FilterId = (typeof FILTERS)[number]["id"];
@@ -90,7 +95,7 @@ export default function ReelsPage() {
   const items = useMemo(() => data?.items ?? [], [data]);
   const visible = useMemo(() => {
     const f = FILTERS.find((x) => x.id === filter) ?? FILTERS[0];
-    return items.filter((j) => f.match(j.status));
+    return items.filter((j) => f.match(j));
   }, [items, filter]);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.per_page)) : 1;
