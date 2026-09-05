@@ -73,8 +73,11 @@ start_all() {
   say "Launching FastAPI on :8000..."
   (cd backend && nohup ./.venv/bin/python -m uvicorn main:app --port 8000 > ../logs/api.log 2>&1 & echo $! > /tmp/reelbot/api.pid)
 
-  say "Launching Celery worker (with embedded beat)..."
-  (cd backend && nohup ./.venv/bin/celery -A tasks.render worker -l info --pool=solo --concurrency=1 -B > ../logs/worker.log 2>&1 & echo $! > /tmp/reelbot/worker.pid)
+  say "Launching Celery worker (renders + maintenance, embedded beat)..."
+  (cd backend && nohup ./.venv/bin/celery -A tasks.render worker -l info --pool=solo --concurrency=1 -Q celery -B > ../logs/worker.log 2>&1 & echo $! > /tmp/reelbot/worker.pid)
+
+  say "Launching Celery clip worker (isolated 'clips' queue)..."
+  (cd backend && nohup ./.venv/bin/celery -A tasks.render worker -l info --pool=solo --concurrency=1 -Q clips -n clipworker@%h > ../logs/clipworker.log 2>&1 & echo $! > /tmp/reelbot/clipworker.pid)
 
   say "Launching Next.js on :3000..."
   (cd frontend && nohup npm run dev -- -p 3000 > ../logs/next.log 2>&1 & echo $! > /tmp/reelbot/next.pid)
@@ -92,7 +95,7 @@ start_all() {
 }
 
 stop_all() {
-  for f in api worker next; do
+  for f in api worker clipworker next; do
     if [ -f "/tmp/reelbot/$f.pid" ]; then
       kill "$(cat /tmp/reelbot/$f.pid)" 2>/dev/null && say "stopped $f" || warn "$f not running"
       rm -f "/tmp/reelbot/$f.pid"
@@ -114,7 +117,7 @@ status_one() {
 }
 
 status_all() {
-  status_one api; status_one worker; status_one next
+  status_one api; status_one worker; status_one clipworker; status_one next
   docker compose ps --format '{{.Name}}: {{.Status}}' 2>/dev/null || warn "docker not running"
 }
 
@@ -124,10 +127,11 @@ case "${1:-start}" in
   status) status_all ;;
   logs)
     case "${2:-all}" in
-      api)    tail -f logs/api.log ;;
-      worker) tail -f logs/worker.log ;;
-      next)   tail -f logs/next.log ;;
-      *)      tail -f logs/*.log ;;
+      api)        tail -f logs/api.log ;;
+      worker)     tail -f logs/worker.log ;;
+      clipworker) tail -f logs/clipworker.log ;;
+      next)       tail -f logs/next.log ;;
+      *)          tail -f logs/*.log ;;
     esac ;;
-  *) echo "Usage: ./run.sh [start|stop|status|logs [api|worker|next|all]]"; exit 1 ;;
+  *) echo "Usage: ./run.sh [start|stop|status|logs [api|worker|clipworker|next|all]]"; exit 1 ;;
 esac

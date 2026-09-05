@@ -21,6 +21,15 @@ celery = Celery("reelbot", broker=settings.REDIS_URL, backend=settings.REDIS_URL
 # `include` makes the worker import them at startup so beat messages always
 # find a registered consumer.
 celery.conf.include = ["tasks.maintenance", "tasks.backgrounds", "tasks.clip"]
+
+# Clip jobs are long (Whisper + LLM + N encodes) and would starve reel renders on
+# a shared queue. Route them to a dedicated 'clips' queue consumed by its own
+# worker (see run.sh); everything else stays on the default queue. (audit A10)
+celery.conf.task_routes = {
+    "tasks.clip.analyse_and_clip": {"queue": "clips"},
+}
+celery.conf.task_default_queue = "celery"
+
 celery.conf.beat_schedule = {
     "reap-expired-reels": {"task": "tasks.maintenance.reap_expired_reels", "schedule": 60.0},
     "sweep-stale-uploads": {"task": "tasks.maintenance.sweep_stale_uploads", "schedule": 3600.0},
