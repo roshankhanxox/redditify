@@ -143,6 +143,49 @@ export interface AdminJob extends Job {
   user_email: string | null;
 }
 
+export type ClipType =
+  | "opinion_bomb"
+  | "story_peak"
+  | "value_drop"
+  | "pattern_interrupt"
+  | "quotable_moment"
+  | "emotional_peak";
+
+export interface Clip {
+  id: string;
+  index: number;
+  start_seconds: number;
+  end_seconds: number;
+  duration_seconds: number | null;
+  hook: string;
+  reason: string;
+  engagement_score: number;
+  clip_type: ClipType | string;
+  status: "pending" | "done" | "failed";
+  result_key: string | null;
+  thumbnail_url: string | null;
+  created_at: string;
+}
+
+export interface ClipJob {
+  id: string;
+  source_label: string;
+  status: string;
+  clip_count: number;
+  error_message: string | null;
+  settings: Record<string, unknown>;
+  clips: Clip[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClipJobList {
+  items: ClipJob[];
+  page: number;
+  per_page: number;
+  total: number;
+}
+
 export interface AdminUser {
   id: string;
   email: string;
