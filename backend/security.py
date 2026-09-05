@@ -30,6 +30,7 @@ def create_access_token(user: User) -> str:
         "email": user.email,
         "role": user.role,
         "must_change_password": user.must_change_password,
+        "tv": user.token_version,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
@@ -54,6 +55,9 @@ async def get_current_user(
     user = await db.get(User, uuid.UUID(user_id))
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    # Reject tokens issued before the most recent password change (audit A2).
+    if payload.get("tv", 0) != user.token_version:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Token revoked — please sign in again")
     return user
 
 

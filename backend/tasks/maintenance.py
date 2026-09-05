@@ -117,9 +117,10 @@ def sweep_worker_tmp():
 
 @celery.task
 def sweep_orphan_objects():
-    """Weekly audit: every users/*/reels/* and users/*/thumbs/* object must map
-    to a live jobs.result_url. True orphans are deleted loudly."""
-    from models import Job
+    """Weekly audit: every reel/thumb/preview AND clip object under users/* must
+    map to a live DB row. True orphans are deleted loudly. Covers both the reel
+    pipeline (jobs) and the content-engine clip pipeline (clips)."""
+    from models import Clip, ClipJob, Job
     from services import storage
     from sync_db import SyncSessionLocal
 
@@ -130,19 +131,31 @@ def sweep_orphan_objects():
     for page in paginator.paginate(Bucket=settings.S3_BUCKET, Prefix="users/"):
         for obj in page.get("Contents", []):
             k = obj["Key"]
-            if "/reels/" in k or "/thumbs/" in k or "/previews/" in k:
+            if "/reels/" in k or "/thumbs/" in k or "/previews/" in k or "/clips/" in k:
                 keys.add(k)
     if not keys:
         return 0
     from sqlalchemy import select as sa_select
 
     with SyncSessionLocal() as db:
-        rows = db.execute(
+        job_rows = db.execute(
             sa_select(Job.user_id, Job.id).where(Job.result_url.isnot(None))
         ).all()
-    live = {f"users/{user_id}/reels/{job_id}.mp4" for user_id, job_id in rows}
-    live |= {f"users/{user_id}/thumbs/{job_id}.jpg" for user_id, job_id in rows}
-    live |= {f"users/{user_id}/previews/{job_id}.mp4" for user_id, job_id in rows}
+        # Clip objects live under users/{uid}/clips/{clip_job_id}/{index}{.mp4,_thumb.jpg}.
+        # Join clips to their owning ClipJob to recover the user id.
+        clip_rows = db.execute(
+            sa_select(ClipJob.user_id, Clip.job_id, Clip.index).join(
+                ClipJob, ClipJob.id == Clip.job_id
+            )
+        ).all()
+
+    live = {f"users/{user_id}/reels/{job_id}.mp4" for user_id, job_id in job_rows}
+    live |= {f"users/{user_id}/thumbs/{job_id}.jpg" for user_id, job_id in job_rows}
+    live |= {f"users/{user_id}/previews/{job_id}.mp4" for user_id, job_id in job_rows}
+    for user_id, clip_job_id, index in clip_rows:
+        live.add(f"users/{user_id}/clips/{clip_job_id}/{index}.mp4")
+        live.add(f"users/{user_id}/clips/{clip_job_id}/{index}_thumb.jpg")
+
     orphans = sorted(keys - live)
     for key in orphans:
         print(f"[orphan-sweep] deleting unreferenced object: {key}")

@@ -74,6 +74,7 @@ async def change_password(
         raise HTTPException(403, detail="Current password is incorrect")
     user.password_hash = hash_password(body.new_password)
     user.must_change_password = False
+    user.token_version += 1  # invalidate every previously-issued JWT (audit A2)
     await db.commit()
     return {"ok": True}
 
