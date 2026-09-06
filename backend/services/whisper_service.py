@@ -200,10 +200,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
     lines = []
     size = max(1, min(3, chunk_size))
+    # Anton is condensed — ~0.60 cap-width per font-size unit; margins eat 160px
+    _AVAILABLE_W = 1080 - 160
+    _CHAR_RATIO  = 0.60
+    base_fs = int(s["fontsize"])
+
     for i in range(0, len(words), size):
         group = words[i : i + size]
         n = len(group)
-        chunk_end = group[-1]["end"] + 0.1
+
+        # End exactly at next group's start to prevent transition flash
+        next_start = words[i + size]["start"] if i + size < len(words) else None
+        chunk_end  = (next_start - 0.001) if next_start is not None else group[-1]["end"] + 0.15
+
+        # Scale font down if the group text would overflow the frame width
+        group_chars = len(" ".join(w["word"].strip() for w in group))
+        needed_fs   = int(_AVAILABLE_W / max(1, group_chars * _CHAR_RATIO))
+        group_fs    = min(base_fs, max(52, needed_fs))
+        fs_tag      = r"{\fs" + str(group_fs) + r"}" if group_fs < base_fs else ""
 
         for k in range(n):
             ev_start = group[k]["start"]
@@ -222,7 +236,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 else:
                     parts.append(r"{\c" + base_inline + r"\fscx100\fscy100}" + text)
 
-            line_text = " ".join(parts)
+            line_text = fs_tag + " ".join(parts)
             lines.append(f"Dialogue: 0,{ts(ev_start)},{ts(ev_end)},Reel,,0,0,0,,{line_text}")
 
     with open(path, "w") as f:

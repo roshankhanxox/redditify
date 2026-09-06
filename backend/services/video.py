@@ -230,6 +230,39 @@ def render_clip(src: str, dst: str, start: float, duration: float, subs: str | N
     return dst
 
 
+def trim_clip(src: str, dst: str, start: float, duration: float) -> str:
+    """Seek + trim without transcode — preserves original resolution."""
+    run_ffmpeg([
+        "-ss", f"{max(0.0, start):.3f}",
+        "-i", src,
+        "-t", f"{duration:.3f}",
+        "-map", "0:v:0", "-map", "0:a:0?",
+        "-c", "copy",
+        dst,
+    ])
+    return dst
+
+
+def burn_subs(video_path: str, subs_path: str) -> str:
+    """Burn subs_path into video_path in-place (overwrites)."""
+    import shutil
+    import tempfile
+    tmp = tempfile.mktemp(suffix=".mp4")
+    sub_esc = subs_path.replace("\\", "/").replace(":", "\\:")
+    run_ffmpeg([
+        "-i", video_path,
+        "-vf", f"subtitles='{sub_esc}'",
+        "-map", "0:v:0", "-map", "0:a:0?",
+        "-c:v", "libx264", "-crf", "18", "-preset", "veryfast",
+        "-c:a", "aac", "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        tmp,
+    ])
+    shutil.move(tmp, video_path)
+    return video_path
+
+
 def extract_thumbnail(src: str, dst: str, at_seconds: float = 1.0) -> str:
     """Poster frame for dashboard cards: 270x480 JPG grabbed near at_seconds."""
     run_ffmpeg([

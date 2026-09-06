@@ -128,6 +128,11 @@ def _sanitize_clip_settings(s: dict) -> dict:
     hl = s.get("caption_highlight_color", "yellow")
     out["caption_highlight_color"] = hl if hl in valid_highlights else "yellow"
 
+    out["smart_crop_enabled"] = bool(s.get("smart_crop_enabled", False))
+    valid_crop_modes = {"crop", "resize"}
+    crop_mode = s.get("smart_crop_mode", "crop")
+    out["smart_crop_mode"] = crop_mode if crop_mode in valid_crop_modes else "crop"
+
     return out
 
 

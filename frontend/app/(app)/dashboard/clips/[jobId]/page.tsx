@@ -368,7 +368,7 @@ function ClipCard({
               <img
                 src={clip.thumbnail_url}
                 alt={`Clip ${clip.index + 1} thumbnail`}
-                className="absolute inset-0 h-full w-full object-cover"
+                className="absolute inset-0 h-full w-full object-contain"
               />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted to-muted/30">
@@ -429,22 +429,21 @@ function ClipCard({
         )}
 
         {/* Footer actions */}
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+        <div className="mt-auto flex items-center justify-between gap-1 pt-1">
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
             onClick={handleDismiss}
-            title="Remove this clip (5 s undo)"
+            title="Dismiss (5 s undo)"
           >
-            <X className="size-3" />
-            Dismiss
+            <X className="size-3.5" />
           </Button>
 
           {clip.status === "done" && (
             <Button
               size="sm"
-              className="h-7 gap-1.5 px-3 text-xs"
+              className="h-7 gap-1 px-2.5 text-xs"
               onClick={handleDownload}
               disabled={downloading}
             >

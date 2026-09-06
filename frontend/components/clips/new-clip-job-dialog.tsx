@@ -6,6 +6,7 @@ import { Loader2, Upload, Video } from "lucide-react";
 import { api, uploadBackground } from "@/lib/api";
 import type { UserBackground, UserBackgroundList } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ export function NewClipJobDialog({ open, onOpenChange, onCreated }: Props) {
   const [uploadPhase, setUploadPhase] = useState<"uploading" | "processing">("uploading");
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [karaokeEnabled, setKaraokeEnabled] = useState(false);
+  const [smartCropEnabled, setSmartCropEnabled] = useState(false);
 
   const { data: bgData } = useSWR<UserBackgroundList>(
     open ? "/backgrounds?kind=video&per_page=50" : null,
@@ -94,6 +96,8 @@ export function NewClipJobDialog({ open, onOpenChange, onCreated }: Props) {
           captions_enabled: captionsEnabled,
           caption_animation: captionsEnabled && karaokeEnabled ? "karaoke" : "none",
           caption_highlight_color: "yellow",
+          smart_crop_enabled: smartCropEnabled,
+          smart_crop_mode: "crop",
         },
       });
       onCreated(data.clip_job_id);
@@ -208,54 +212,48 @@ export function NewClipJobDialog({ open, onOpenChange, onCreated }: Props) {
               </div>
             )}
 
+            {/* Smart crop toggle */}
+            <div className="rounded-lg border border-border/60">
+              <div className="flex items-center gap-3 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">Smart crop</p>
+                  <p className="text-xs text-muted-foreground">
+                    Face-track the speaker and auto-frame to 9:16
+                  </p>
+                </div>
+                <Switch
+                  checked={smartCropEnabled}
+                  onCheckedChange={setSmartCropEnabled}
+                />
+              </div>
+            </div>
+
             {/* Caption toggle */}
             <div className="rounded-lg border border-border/60">
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <div>
+              <div className="flex items-center gap-3 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">Captions</p>
                   <p className="text-xs text-muted-foreground">
                     Burn synced subtitles onto each clip
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setCaptionsEnabled((v) => !v)}
-                  className={cn(
-                    "relative h-5 w-9 rounded-full transition-colors",
-                    captionsEnabled ? "bg-primary" : "bg-muted",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-                      captionsEnabled ? "translate-x-4" : "translate-x-0.5",
-                    )}
-                  />
-                </button>
+                <Switch
+                  checked={captionsEnabled}
+                  onCheckedChange={setCaptionsEnabled}
+                />
               </div>
               {captionsEnabled && (
-                <div className="flex items-center justify-between border-t border-border/60 px-3 py-2">
-                  <div>
+                <div className="flex items-center gap-3 border-t border-border/60 px-3 py-2">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">Karaoke style</p>
                     <p className="text-xs text-muted-foreground">
                       Word-by-word highlight pop
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setKaraokeEnabled((v) => !v)}
-                    className={cn(
-                      "relative h-5 w-9 rounded-full transition-colors",
-                      karaokeEnabled ? "bg-primary" : "bg-muted",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-                        karaokeEnabled ? "translate-x-4" : "translate-x-0.5",
-                      )}
-                    />
-                  </button>
+                  <Switch
+                    checked={karaokeEnabled}
+                    onCheckedChange={setKaraokeEnabled}
+                  />
                 </div>
               )}
             </div>
