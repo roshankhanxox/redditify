@@ -56,7 +56,8 @@ def analyse_and_clip(self, clip_job_id: str):
             source_key = job.source_key
             user_id = str(job.user_id)
             cfg = job.settings or {}
-            num_clips = int(cfg.get("num_clips", 10))
+            _num_clips_raw = cfg.get("num_clips")
+            num_clips = int(_num_clips_raw) if _num_clips_raw is not None else None
 
         # 1. Download source video
         _set_status(clip_job_id, "DOWNLOADING")
@@ -124,6 +125,8 @@ def analyse_and_clip(self, clip_job_id: str):
         }
         caption_animation = cfg.get("caption_animation", "none")
         caption_highlight = cfg.get("caption_highlight_color", "yellow")
+        smart_crop_on   = bool(cfg.get("smart_crop_enabled", False))
+        smart_crop_mode = cfg.get("smart_crop_mode", "crop")
 
         completed = 0
         for i, w in enumerate(clip_windows):
@@ -169,9 +172,17 @@ def analyse_and_clip(self, clip_job_id: str):
                             else:
                                 subs_path = None
 
-                # Single-pass: seek + trim + 9:16 crop + caption burn + source audio.
                 output_path = os.path.join(clip_tmp, "output.mp4")
-                video.render_clip(video_path, output_path, w.start, duration, subs=subs_path)
+                if smart_crop_on:
+                    from services import smart_crop
+                    raw_path = os.path.join(clip_tmp, "raw.mp4")
+                    video.trim_clip(video_path, raw_path, w.start, duration)
+                    smart_crop.smart_crop_clip(raw_path, output_path, mode=smart_crop_mode, tmp_dir=clip_tmp)
+                    if subs_path:
+                        video.burn_subs(output_path, subs_path)
+                else:
+                    # Single-pass: seek + trim + 9:16 crop + caption burn + source audio.
+                    video.render_clip(video_path, output_path, w.start, duration, subs=subs_path)
 
                 # Upload
                 result_key = f"users/{user_id}/clips/{clip_job_id}/{i}.mp4"

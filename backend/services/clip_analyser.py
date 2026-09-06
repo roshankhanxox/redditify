@@ -15,65 +15,71 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an elite short-form content strategist. You have spent years studying what makes videos go viral on TikTok, YouTube Shorts, and Instagram Reels. You understand the psychology of the scroll — why someone stops, why they watch to the end, why they share. Your entire job right now is to read a video transcript and identify the exact moments that would perform best as standalone short-form clips.
+SYSTEM_PROMPT = """You are a short-form video editor. Your job is to extract the best standalone clips from a podcast or interview transcript.
 
-## The six clip types you hunt for
+## What to extract
 
-**opinion_bomb** — A bold, confident take that challenges conventional wisdom or says something most people think but never say out loud. These start arguments in comment sections. The speaker doesn't hedge — they commit. High rewatch because people want to quote it.
+Look for two things only:
 
-**story_peak** — The climax or turning point of a narrative. The moment everything changes, the punchline lands, the twist is revealed. Viewers don't need context because the emotional payoff is self-contained. Starts with tension and ends with resolution within the clip.
+1. **Q&A moments** — A question asked by the host or guest, followed by the full answer. The clip begins at the question (or 1–2 sentences before it if that context helps the viewer understand why the question is being asked) and ends only when the answer is fully complete. Never cut an answer short.
 
-**value_drop** — Rapid-fire, immediately useful information. A list, a framework, a how-to that someone can act on right now. Dense — every sentence earns its place. Zero filler. Viewers screenshot or save because they don't want to lose it.
+2. **Self-contained stories** — A narrative with a clear beginning, middle, and end that a cold viewer can follow without any prior context. The clip starts at the first sentence of the story and ends at the natural conclusion.
 
-**pattern_interrupt** — A moment that breaks the expected flow — a surprising statistic, an absurd comparison, a counterintuitive claim, or a complete 180 from what the viewer assumed was coming. Works because the brain flags anomalies and demands resolution.
+Do not extract:
+- Greetings, intros, sign-offs, or "thanks for having me" moments
+- Filler or transitions with no substance
+- Moments that only make sense if you watched the 10 minutes before them
 
-**quotable_moment** — A single sentence or short exchange that lands hard completely out of context. Can be funny, profound, savage, or vulnerable. Works as a caption screenshot. The kind of thing people DM to friends.
+## Clip length
 
-**emotional_peak** — Genuine unscripted emotion — real vulnerability, unexpected humour, visible frustration, authentic triumph. Unpolished. Feels real. Audiences respond to authenticity over production quality every time.
+- Aim for 40–120 seconds per clip. Most good Q&A exchanges fall in this range naturally.
+- There is no hard maximum — if a story or answer runs 3 minutes and is genuinely great, include it in full. Never cut before the payoff just to stay short.
+- Minimum 20 seconds.
 
-## What kills performance — never pick these
+## Timestamp rules — read carefully
 
-- Segments that start mid-thought with no payoff (viewer has no idea what's happening)
-- Openers with no hook in the first 2-3 seconds (slow starts get scrolled past)
-- Clips that cut before the punchline, resolution, or key insight is delivered
-- Rambling filler — "um", "you know", "anyway", excessive throat-clearing
-- Segments that only make sense if you watched the first 10 minutes
-- Pure setup with no payoff within the clip window
+- The transcript contains timestamps as plain decimal seconds, e.g. [6.34 → 23.54].
+- Your start and end values in the JSON **must be taken directly from timestamps that appear in the transcript**. Do not calculate, interpolate, or invent timestamps.
+- start = the timestamp of the first word of the clip (a decimal number like 6.34)
+- end = the timestamp of the last word of the clip (a decimal number like 319.74)
+- Both must be plain decimal numbers — no colons, no units, just the number.
 
-## Clip length rules
+## Coverage
 
-- Minimum: 20 seconds (shorter clips rarely build enough tension before the payoff)
-- Maximum: 90 seconds (attention drops sharply after 90s for short-form)
-- Sweet spot: 35–65 seconds
-- The clip must start at or very close to a strong hook — not mid-ramble
-- The clip must end after the payoff is complete — not before
+Read the entire transcript before selecting anything. Divide the video into thirds and ensure at least one clip comes from each third. Do not return clips only from the beginning.
 
-## Diversity rule
+## No overlaps
 
-Do NOT return 10 clips all from the same segment of the video. Spread them across the full length. Ideally represent at least 4 of the 6 clip types.
+Sort your final list by start time. Each clip's start must be after the previous clip's end. If two candidates overlap, keep the stronger one.
 
-## Output format
+## How many clips
 
-Return ONLY a JSON array. No explanation, no markdown, no preamble. Exactly 10 objects:
+Return 1 clip per 6 minutes of video, minimum 5, maximum 20. A 13-minute video → 5 clips. A 60-minute video → 10 clips.
+
+## Output
+
+Return ONLY a valid JSON array — no markdown, no explanation, no preamble.
 
 [
   {
-    "start": <float, seconds from video start>,
-    "end": <float, seconds from video start>,
-    "hook": "<one punchy sentence — the actual line or idea that IS the scroll-stopper>",
-    "reason": "<exactly 2 sentences: why this moment works as a standalone clip>",
-    "engagement_score": <integer 1-10>,
-    "clip_type": "<one of: opinion_bomb | story_peak | value_drop | pattern_interrupt | quotable_moment | emotional_peak>"
+    "start": <float, seconds — must exist verbatim in the transcript>,
+    "end": <float, seconds — must exist verbatim in the transcript>,
+    "opening_line": "<exact first words of this clip, copied from the transcript>",
+    "closing_line": "<exact last words of this clip, copied from the transcript>",
+    "hook": "<one sentence: the specific line or moment that makes someone stop scrolling>",
+    "reason": "<two sentences: why this works as a standalone clip for a cold viewer>",
+    "engagement_score": <integer 1–10>,
+    "clip_type": "<qa_moment | story>"
   }
 ]
 
-Rank by engagement_score descending. Clips must not overlap. The start and end values must be timestamps that actually appear in the transcript provided.
+Rank by engagement_score descending. The opening_line and closing_line are your own check — if you cannot find those exact words at those timestamps in the transcript, your timestamps are wrong and you must correct them before returning.
 """
 
 CHUNK_WINDOW_SECONDS = 480   # 8 minutes per chunk when chunking is needed
 CHUNK_OVERLAP_SECONDS = 120  # 2 minutes overlap
 MIN_CLIP_SECONDS = 20
-MAX_CLIP_SECONDS = 90
+MIN_CLIP_SECONDS_QUOTABLE = 8
 
 
 @dataclass
@@ -84,6 +90,10 @@ class ClipWindow:
     reason: str
     engagement_score: int
     clip_type: str
+    opening_line: str = ""
+    closing_line: str = ""
+    context_dependency: str = "low"
+    natural_end: bool = True
 
 
 def _format_transcript(words: list[dict], offset: float = 0.0) -> str:
@@ -130,16 +140,16 @@ def _format_transcript(words: list[dict], offset: float = 0.0) -> str:
 
 
 def _fmt_ts(seconds: float) -> str:
-    m = int(seconds) // 60
-    s = seconds - m * 60
-    return f"{m:02d}:{s:05.2f}"
+    return f"{seconds:.2f}"
 
 
 def _parse_ts(ts: str) -> float:
-    """Parse MM:SS.ss → float seconds."""
+    """Parse float seconds string → float. Handles legacy MM:SS format too."""
     ts = ts.strip()
-    m, s = ts.split(":")
-    return int(m) * 60 + float(s)
+    if ":" in ts:
+        m, s = ts.split(":")
+        return int(m) * 60 + float(s)
+    return float(ts)
 
 
 def _parse_response(raw: str) -> list[dict]:
@@ -190,16 +200,13 @@ def _validate_clip(c: dict, words: list[dict], video_duration: float) -> ClipWin
     start = max(0.0, start)
     end = min(video_duration, end)
 
+    min_dur = MIN_CLIP_SECONDS
+
     duration = end - start
-    if duration < MIN_CLIP_SECONDS or duration > MAX_CLIP_SECONDS:
-        # Try to salvage by extending/trimming to target
-        if duration < MIN_CLIP_SECONDS:
-            end = min(video_duration, start + MIN_CLIP_SECONDS)
-            duration = end - start
-        elif duration > MAX_CLIP_SECONDS:
-            end = start + MAX_CLIP_SECONDS
-            duration = end - start
-        if duration < MIN_CLIP_SECONDS:
+    if duration < min_dur:
+        end = min(video_duration, start + min_dur)
+        duration = end - start
+        if duration < min_dur:
             return None
 
     try:
@@ -207,10 +214,19 @@ def _validate_clip(c: dict, words: list[dict], video_duration: float) -> ClipWin
     except (TypeError, ValueError):
         score = 5
 
-    valid_types = {"opinion_bomb", "story_peak", "value_drop", "pattern_interrupt", "quotable_moment", "emotional_peak"}
+    valid_types = {"qa_moment", "story", "opinion_bomb", "story_peak", "value_drop", "pattern_interrupt", "quotable_moment", "emotional_peak"}
     clip_type = str(c.get("clip_type", "")).strip()
     if clip_type not in valid_types:
-        clip_type = "story_peak"
+        clip_type = "story"
+
+    valid_context = {"low", "medium", "high"}
+    context_dep = str(c.get("context_dependency", "low")).strip()
+    if context_dep not in valid_context:
+        context_dep = "low"
+
+    natural_end = c.get("natural_end", True)
+    if not isinstance(natural_end, bool):
+        natural_end = str(natural_end).lower() != "false"
 
     return ClipWindow(
         start=float(round(start, 2)),
@@ -219,6 +235,10 @@ def _validate_clip(c: dict, words: list[dict], video_duration: float) -> ClipWin
         reason=str(c.get("reason", ""))[:500],
         engagement_score=score,
         clip_type=clip_type,
+        opening_line=str(c.get("opening_line", ""))[:300],
+        closing_line=str(c.get("closing_line", ""))[:300],
+        context_dependency=context_dep,
+        natural_end=natural_end,
     )
 
 
@@ -236,7 +256,7 @@ def _deduplicate(clips: list[ClipWindow]) -> list[ClipWindow]:
     return sorted(kept, key=lambda c: -c.engagement_score)
 
 
-def analyse(words: list[dict], video_duration: float, num_clips: int = 10) -> list[ClipWindow]:
+def analyse(words: list[dict], video_duration: float, num_clips: int | None = None) -> list[ClipWindow]:
     """Main entry point. Takes Whisper words → returns ranked ClipWindow list.
 
     For videos ≤1 hour: single LLM call with full transcript.
@@ -244,6 +264,14 @@ def analyse(words: list[dict], video_duration: float, num_clips: int = 10) -> li
     """
     from services.llm import get_llm
 
+    if num_clips is None:
+        # 1 clip per 6 minutes, clamped to [5, 20]
+        num_clips = max(5, min(20, math.ceil(video_duration / 360)))
+
+    logger.info(
+        "clip_analyser: starting — video_duration=%.1fs (%.1f min) target_clips=%d words=%d",
+        video_duration, video_duration / 60, num_clips, len(words),
+    )
     llm = get_llm()
 
     if video_duration <= 3600:
@@ -266,7 +294,7 @@ def _call_llm(llm, transcript: str, words: list[dict], video_duration: float) ->
     # rather than masking them as an empty result. Only a genuine parse failure
     # is handled here, and it raises a distinct, actionable message.
     raw = llm.complete(SYSTEM_PROMPT, user_msg)
-    logger.debug("LLM raw response length: %d chars", len(raw))
+    logger.info("clip_analyser: LLM response %d chars — first 800: %r", len(raw), raw[:800])
     try:
         items = _parse_response(raw)
     except (json.JSONDecodeError, ValueError) as exc:
@@ -275,11 +303,27 @@ def _call_llm(llm, transcript: str, words: list[dict], video_duration: float) ->
             "LLM returned unparseable output — retry, or switch LLM_PROVIDER."
         ) from exc
 
+    logger.info("clip_analyser: LLM returned %d raw items", len(items))
     clips = []
-    for item in items:
+    for i, item in enumerate(items):
+        raw_start = item.get("start")
+        raw_end = item.get("end")
+        raw_dur = (float(raw_end) - float(raw_start)) if raw_start is not None and raw_end is not None else None
         clip = _validate_clip(item, words, video_duration)
         if clip:
+            logger.info(
+                "clip_analyser: item %d ACCEPTED — type=%s start=%.1f end=%.1f dur=%.1f raw_dur=%.1f",
+                i, clip.clip_type, clip.start, clip.end, clip.end - clip.start,
+                raw_dur if raw_dur is not None else -1,
+            )
             clips.append(clip)
+        else:
+            logger.info(
+                "clip_analyser: item %d DISCARDED — type=%s raw_start=%s raw_end=%s raw_dur=%s",
+                i, item.get("clip_type", "?"), raw_start, raw_end,
+                f"{raw_dur:.1f}" if raw_dur is not None else "?",
+            )
+    logger.info("clip_analyser: %d/%d items passed validation", len(clips), len(items))
     return clips
 
 

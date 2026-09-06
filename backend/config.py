@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     LLM_MODEL_ANTHROPIC: str = "claude-sonnet-4-6"
-    LLM_MODEL_OPENAI: str = "gpt-4o-mini"
+    LLM_MODEL_OPENAI: str = "gpt-4o"
     LLM_MODEL_GROQ: str = "openai/gpt-oss-20b"
     MAX_CLIPS_PER_JOB: int = 10
 
