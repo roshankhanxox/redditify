@@ -375,6 +375,8 @@ export function stateFromJob(job: {
     caption_color: pick(st.caption_color, ["white", "yellow", "brand"] as const, "white"),
     caption_outline: num(st.caption_outline, 6, 0, 12),
     caption_words: pick(st.caption_words, [1, 2, 3] as const, 2),
+    caption_animation: pick(st.caption_animation, ["none", "karaoke"] as const, "none"),
+    caption_highlight_color: pick(st.caption_highlight_color, ["white", "yellow", "brand"] as const, "yellow"),
     title_enabled: bool(st.title_enabled, true),
     title_position: pick(st.title_position, ["top", "bottom"] as const, "top"),
     title_scale: num(st.title_scale, 100, 60, 130),
