@@ -13,7 +13,7 @@ from models import User, UserBackground
 from ratelimit import rate_limit
 from security import get_current_user
 from services import storage
-from tasks.backgrounds import MAX_DURATION_SECONDS, MIN_DURATION_SECONDS
+from tasks.backgrounds import MAX_LOOP_DURATION_SECONDS, MIN_DURATION_SECONDS
 
 router = APIRouter(tags=["backgrounds"])
 

@@ -201,6 +201,11 @@ def _sanitize_settings(s: dict) -> dict:
     out["caption_outline"] = _clamp_int(s, "caption_outline", 6, 0, 12)
     out["caption_words"] = _clamp_int(s, "caption_words", 2, 1, 3)
 
+    anim = s.get("caption_animation", "none")
+    out["caption_animation"] = anim if anim in ("none", "karaoke") else "none"
+    hl = s.get("caption_highlight_color", "yellow")
+    out["caption_highlight_color"] = hl if hl in ("white", "yellow", "brand") else "yellow"
+
     out["title_enabled"] = _to_bool(s.get("title_enabled"), True)
     title_pos = s.get("title_position")
     out["title_position"] = title_pos if title_pos in VALID_TITLE_POSITIONS else "top"

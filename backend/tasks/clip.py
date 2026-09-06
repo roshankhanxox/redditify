@@ -122,6 +122,8 @@ def analyse_and_clip(self, clip_job_id: str):
             "caption_color": cfg.get("caption_color", "white"),
             "caption_position": cfg.get("caption_position", "lower"),
         }
+        caption_animation = cfg.get("caption_animation", "none")
+        caption_highlight = cfg.get("caption_highlight_color", "yellow")
 
         completed = 0
         for i, w in enumerate(clip_windows):
@@ -151,10 +153,21 @@ def analyse_and_clip(self, clip_job_id: str):
                         })
                     if clip_words:
                         style = whisper_service.caption_style_from_settings(caption_style_cfg)
-                        chunks = whisper_service.words_to_chunks(clip_words, chunk_size=2)
-                        if chunks:
-                            subs_path = os.path.join(clip_tmp, "subs.ass")
-                            whisper_service.chunks_to_ass(chunks, subs_path, style=style)
+                        subs_path = os.path.join(clip_tmp, "subs.ass")
+                        if caption_animation == "karaoke":
+                            result = whisper_service.words_to_karaoke_ass(
+                                clip_words, subs_path, style=style,
+                                chunk_size=3,  # 3 words keeps inactive context visible
+                                highlight=caption_highlight,
+                            )
+                            if not result:
+                                subs_path = None
+                        else:
+                            chunks = whisper_service.words_to_chunks(clip_words, chunk_size=2)
+                            if chunks:
+                                whisper_service.chunks_to_ass(chunks, subs_path, style=style)
+                            else:
+                                subs_path = None
 
                 # Single-pass: seek + trim + 9:16 crop + caption burn + source audio.
                 output_path = os.path.join(clip_tmp, "output.mp4")

@@ -120,6 +120,14 @@ def _sanitize_clip_settings(s: dict) -> dict:
     pos = s.get("caption_position", "lower")
     out["caption_position"] = pos if pos in valid_positions else "lower"
 
+    valid_animations = {"none", "karaoke"}
+    anim = s.get("caption_animation", "none")
+    out["caption_animation"] = anim if anim in valid_animations else "none"
+
+    valid_highlights = {"white", "yellow", "brand"}
+    hl = s.get("caption_highlight_color", "yellow")
+    out["caption_highlight_color"] = hl if hl in valid_highlights else "yellow"
+
     return out
 
 

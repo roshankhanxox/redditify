@@ -11,7 +11,7 @@ import {
   type CharacterPlacement,
   type TextPlacement,
 } from "@/lib/placement";
-import type { CaptionColor, CaptionLayout, CaptionMode, CaptionPosition } from "@/lib/types";
+import type { CaptionAnimation, CaptionColor, CaptionLayout, CaptionMode, CaptionPosition } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,12 +51,16 @@ export interface CaptionPreview {
   layout?: CaptionLayout;
   text?: string;
   scale?: number;
+  animation?: CaptionAnimation;
+  highlightColor?: CaptionColor;
   onChange?: (enabled: boolean) => void;
   onYChange?: (y: number) => void;
   onModeChange?: (mode: CaptionMode) => void;
   onLayoutChange?: (layout: CaptionLayout) => void;
   onScaleChange?: (scale: number) => void;
   onTextChange?: (text: string) => void;
+  onAnimationChange?: (animation: CaptionAnimation) => void;
+  onHighlightColorChange?: (color: CaptionColor) => void;
 }
 
 // Mirror of services/caption_png.py fit budgets (1080x1920 frame px).
@@ -876,6 +880,41 @@ export function LayerEditor({
                   { value: "static", label: "Static (typed)" },
                 ]}
               />
+              {(captions.mode ?? "synced") === "synced" && captions.onAnimationChange && (
+                <div className="flex flex-col gap-1.5">
+                  <Segmented
+                    value={captions.animation ?? "none"}
+                    onChange={(v) => captions.onAnimationChange?.(v as CaptionAnimation)}
+                    options={[
+                      { value: "none", label: "Standard" },
+                      { value: "karaoke", label: "Karaoke" },
+                    ]}
+                  />
+                  {captions.animation === "karaoke" && captions.onHighlightColorChange && (
+                    <div className="flex items-center justify-between pt-0.5">
+                      <span className="text-[13px] text-muted-foreground">Highlight colour</span>
+                      <div className="flex gap-2">
+                        {(["white", "yellow", "brand"] as CaptionColor[]).map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            aria-label={`${c} highlight`}
+                            aria-pressed={captions.highlightColor === c}
+                            onClick={() => captions.onHighlightColorChange?.(c)}
+                            className={cn(
+                              "size-5 cursor-pointer rounded-full border-2 transition-all",
+                              captions.highlightColor === c
+                                ? "scale-110 border-primary"
+                                : "border-transparent opacity-70 hover:opacity-100",
+                            )}
+                            style={{ backgroundColor: CAPTION_COLOR_HEX[c] }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {captions.mode === "static" && (
                 <div className="flex flex-col gap-1">
                   {captions.onLayoutChange && (

@@ -433,6 +433,8 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                       caption_color: s.caption_color,
                       caption_outline: s.caption_outline,
                       caption_words: s.caption_words,
+                      caption_animation: s.caption_animation,
+                      caption_highlight_color: s.caption_highlight_color,
                       title_enabled: s.title_enabled,
                       title_position: s.title_position,
                       title_scale: s.title_scale,
@@ -987,6 +989,10 @@ function MemeLookStep({
             onLayoutChange: (v) => setValue("caption_layout", v, { shouldDirty: true }),
             onScaleChange: (v) => setValue("caption_scale", v, { shouldDirty: true }),
             onTextChange: (v) => setValue("caption_text", v, { shouldDirty: true }),
+            animation: watch("caption_animation") ?? "none",
+            highlightColor: watch("caption_highlight_color") ?? "yellow",
+            onAnimationChange: (v) => setValue("caption_animation", v, { shouldDirty: true }),
+            onHighlightColorChange: (v) => setValue("caption_highlight_color", v, { shouldDirty: true }),
           }}
           onCharactersChange={(next) => setValue("characters", next, { shouldDirty: true })}
           onTextsChange={(next) => setValue("text_overlays", next, { shouldDirty: true })}
