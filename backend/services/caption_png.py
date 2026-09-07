@@ -105,7 +105,7 @@ def render_caption_png(
     stroke = max(0, min(12, int(outline)))
 
     canvas_w = MAX_W + PAD * 4
-    line_imgs = [_draw_line(l, font, fill, stroke, canvas_w) for l in lines]
+    line_imgs = [_draw_line(ln, font, fill, stroke, canvas_w) for ln in lines]
     w = min(MAX_W + PAD * 2, max(im.width for im in line_imgs) + PAD * 2)
     h = sum(im.height for im in line_imgs) + PAD * 2
     img = Image.new("RGBA", (max(w, 1), max(h, 1)), (0, 0, 0, 0))

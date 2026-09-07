@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tasks.render import celery  # noqa: E402  (single shared Celery app/worker)
 
-
 # Gameplay background loops: short clips looped under a reel.
 MIN_DURATION_SECONDS = 30.0
 MAX_LOOP_DURATION_SECONDS = 600.0
@@ -134,7 +133,7 @@ def process_background(self, background_id: str):
             pass
         set_status("failed", error_message=str(exc)[:500])
         if transient and self.request.retries < (self.max_retries or 0):
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

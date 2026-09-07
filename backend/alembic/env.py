@@ -1,4 +1,6 @@
 import asyncio
+import os
+import sys
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -7,13 +9,16 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-import sys
-import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import settings
 from db import Base
-from models import Asset, Job, QuotaUsage, User  # noqa: F401 — register models on Base.metadata
+from models import (  # noqa: F401 — register models on Base.metadata
+    Asset,
+    Job,
+    QuotaUsage,
+    User,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

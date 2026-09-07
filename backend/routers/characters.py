@@ -15,13 +15,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import settings
 from db import get_db
-from models import User
-from models import UserBackground
+from models import User, UserBackground
 from security import get_current_user
 from services.storage import (
     delete as storage_delete,
+)
+from services.storage import (
     is_s3,
     presign_put,
     resolve,
@@ -109,8 +109,8 @@ def _process_sync(bg_id: uuid.UUID, user_id: uuid.UUID) -> dict:
     AsyncSession must never be touched off the event loop."""
     from PIL import Image
 
-    from sync_db import SyncSessionLocal
     from services.storage import upload as storage_upload
+    from sync_db import SyncSessionLocal
 
     with SyncSessionLocal() as db:
         bg = db.get(UserBackground, bg_id)

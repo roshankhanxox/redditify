@@ -3,10 +3,7 @@ import shutil
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from sqlalchemy import func, select
 
-from db import get_db
-from models import Asset
 from security import get_current_user, require_admin
 from services import assets as asset_service
 from services.video import get_duration, get_resolution, transcode_vertical
@@ -46,13 +43,13 @@ async def _store_upload(tmp_path: str) -> tuple[str, float, str]:
     resolution = None
     try:
         duration = get_duration(tmp_path)
-    except ValueError:
-        raise HTTPException(422, detail="File has no readable duration — not a valid video?")
+    except ValueError as exc:
+        raise HTTPException(422, detail="File has no readable duration — not a valid video?") from exc
     try:
         w, h = get_resolution(tmp_path)
         resolution = f"{w}x{h}"
-    except ValueError:
-        raise HTTPException(422, detail="File has no video stream")
+    except ValueError as exc:
+        raise HTTPException(422, detail="File has no video stream") from exc
 
     if duration < MIN_DURATION_SECONDS:
         raise HTTPException(422, detail=f"Clip too short: {duration:.1f}s (minimum {MIN_DURATION_SECONDS:.0f}s)")
