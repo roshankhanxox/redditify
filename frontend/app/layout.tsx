@@ -23,9 +23,9 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "ReelBot — Reddit to Reels",
+  title: "ReelBot — Text to Reels",
   description:
-    "Turn any Reddit post into a vertical video with AI voiceover, word-synced subtitles, and gameplay backgrounds.",
+    "Turn any story or long video into a 1080×1920 short-form clip with AI voiceover, word-synced captions, and smart speaker crop. Free and self-hosted.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

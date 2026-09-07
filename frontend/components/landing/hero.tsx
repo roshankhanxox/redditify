@@ -62,8 +62,7 @@ export function Hero({ signedIn }: { signedIn: boolean }) {
             <span
               data-hero-pill
               aria-hidden
-              className="mx-1 inline-block h-[0.62em] w-[1.45em] translate-y-[0.06em] rounded-full bg-cover bg-center align-middle ring-1 ring-white/20 contrast-125 saturate-[0.65]"
-              style={{ backgroundImage: "url(https://picsum.photos/seed/neon-alley/480/240)" }}
+              className="mx-1 inline-block h-[0.62em] w-[1.45em] translate-y-[0.06em] rounded-full bg-gradient-to-br from-neutral-800 via-brand/50 to-neutral-900 align-middle ring-1 ring-white/20"
             />{" "}
             reel.
           </span>
@@ -99,13 +98,7 @@ export function Hero({ signedIn }: { signedIn: boolean }) {
             data-fan-card
             className="group relative z-10 -mr-8 aspect-[9/16] w-[38%] max-w-[260px] shrink-0 overflow-hidden rounded-2xl border border-white/10 shadow-2xl sm:-mr-12"
           >
-            <img
-              src="https://picsum.photos/seed/arcade-cabinet/720/1280"
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 h-full w-full object-cover brightness-[0.55] grayscale contrast-125 transition-transform duration-700 ease-out group-hover:scale-105"
-            />
+            <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 via-zinc-950 to-black transition-transform duration-700 ease-out group-hover:scale-105" />
             <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 font-mono text-xs tracking-widest text-white/70 uppercase">
               <span>00:14</span>
               <span className="flex items-center gap-1.5">
@@ -141,13 +134,7 @@ export function Hero({ signedIn }: { signedIn: boolean }) {
             data-fan-card
             className="group relative z-10 -ml-8 aspect-[9/16] w-[38%] max-w-[260px] shrink-0 overflow-hidden rounded-2xl border border-white/10 shadow-2xl sm:-ml-12"
           >
-            <img
-              src="https://picsum.photos/seed/game-controller/720/1280"
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 h-full w-full object-cover brightness-[0.5] grayscale contrast-125 transition-transform duration-700 ease-out group-hover:scale-105"
-            />
+            <div className="absolute inset-0 bg-gradient-to-b from-stone-800 via-neutral-950 to-black transition-transform duration-700 ease-out group-hover:scale-105" />
             <p className="absolute inset-x-4 bottom-24 text-center text-xl leading-tight font-extrabold text-white [text-shadow:_0_2px_12px_rgb(0_0_0_/_80%)]">
               and then it clicked
             </p>

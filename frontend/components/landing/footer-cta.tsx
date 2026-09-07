@@ -55,14 +55,6 @@ export function FooterCta({ signedIn }: { signedIn: boolean }) {
                 </Link>
               </>
             )}
-            <a
-              href="https://www.reddit.com"
-              target="_blank"
-              rel="noreferrer"
-              className="transition-colors hover:text-foreground"
-            >
-              Reddit
-            </a>
           </nav>
         </div>
       </footer>

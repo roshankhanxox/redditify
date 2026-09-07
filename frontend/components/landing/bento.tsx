@@ -68,13 +68,7 @@ export function Bento() {
             className="group relative flex min-h-[320px] flex-col justify-end overflow-hidden rounded-2xl border border-white/8 bg-card p-6 md:min-h-0 lg:col-span-2 lg:row-span-2"
           >
             <div data-scroll-img className="absolute inset-0 will-change-transform">
-              <img
-                src="https://picsum.photos/seed/city-rain/1200/1200"
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover grayscale contrast-125"
-              />
+              <div className="h-full w-full bg-gradient-to-b from-zinc-800 via-zinc-950 to-black" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/30" />
             </div>
             <div className="relative z-10 transition-transform duration-700 ease-out group-hover:-translate-y-1">
@@ -98,7 +92,7 @@ export function Bento() {
               <Mic className="mb-3 size-5 text-muted-foreground" />
               <h3 className="text-lg font-semibold tracking-tight">Narration on tap</h3>
               <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Ten voices across two engines, with playback speed from 0.8× to 1.5×.
+                20+ voices across two engines, with playback speed from 0.8× to 1.5×.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -136,13 +130,7 @@ export function Bento() {
             className="group relative flex min-h-[240px] flex-col justify-end overflow-hidden rounded-2xl border border-white/8 bg-card p-6"
           >
             <div data-scroll-img className="absolute inset-0 will-change-transform">
-              <img
-                src="https://picsum.photos/seed/retro-console/800/800"
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover grayscale contrast-125"
-              />
+              <div className="h-full w-full bg-gradient-to-b from-stone-800 via-neutral-950 to-black" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
             </div>
             <Gamepad2 className="relative z-10 mb-auto size-5 text-white/80" />
