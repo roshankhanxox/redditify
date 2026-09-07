@@ -212,7 +212,7 @@ class TestStaticCaptions:
         ]
         assert chunks[0]["start"] == 0.0
         assert abs(chunks[-1]["end"] - 10.0) < 0.01
-        for a, b in zip(chunks, chunks[1:]):
+        for a, b in zip(chunks, chunks[1:], strict=False):
             assert abs(a["end"] - b["start"]) < 0.01   # contiguous, no gaps
 
     def test_even_chunks_edge_cases(self):
@@ -229,10 +229,11 @@ class TestStaticCaptions:
 
 class TestCaptionPng:
     def test_plain_text_fits_budget_and_crops(self):
+        import tempfile
+
         from PIL import Image
 
         from services.caption_png import MAX_H, MAX_W, render_caption_png
-        import tempfile
 
         info = render_caption_png(
             "wait for it nobody expected this twist ending at all",
@@ -361,7 +362,7 @@ class TestRenderMatrix:
         )
         subprocess.run(
             ["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
-             "-i", f"anullsrc=r=24000:cl=mono", "-t", str(self.D), audio],
+             "-i", "anullsrc=r=24000:cl=mono", "-t", str(self.D), audio],
             check=True, capture_output=True,
         )
         subs = []

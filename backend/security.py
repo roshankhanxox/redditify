@@ -1,11 +1,10 @@
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -31,7 +30,7 @@ def create_access_token(user: User) -> str:
         "role": user.role,
         "must_change_password": user.must_change_password,
         "tv": user.token_version,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        "exp": datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
@@ -45,10 +44,10 @@ async def get_current_user(
     token = credentials.credentials
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Token expired") from exc
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")

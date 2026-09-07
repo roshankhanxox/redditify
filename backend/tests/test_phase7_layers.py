@@ -16,7 +16,6 @@ from services.fonts import get_font_path, list_fonts
 from services.text_overlay import render_text_overlay
 from services.video import get_duration, render_meme_video
 
-
 # ------------------------------------------------------------------ fonts
 
 

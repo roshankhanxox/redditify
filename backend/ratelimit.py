@@ -16,9 +16,8 @@ point of failure for the app.
 from __future__ import annotations
 
 import jwt
-from fastapi import HTTPException, Request
-
 import redis.asyncio as aioredis
+from fastapi import HTTPException, Request
 
 from config import settings
 

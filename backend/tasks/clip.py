@@ -233,7 +233,7 @@ def analyse_and_clip(self, clip_job_id: str):
         transient = isinstance(exc, (ConnectionError, TimeoutError))
         _set_status(clip_job_id, "FAILED", error_message=str(exc)[:2000])
         if transient and self.request.retries < (self.max_retries or 0):
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         raise
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

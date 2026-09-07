@@ -4,7 +4,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import uuid
 
 import pytest
@@ -12,7 +11,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from routers.jobs import job_to_dict, thumbnail_key_for
-from services.video import extract_thumbnail, get_duration
+from services.video import extract_thumbnail
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")

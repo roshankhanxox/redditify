@@ -1,10 +1,8 @@
-import uuid
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import settings
 from db import get_db
 from models import Job
 from security import get_current_user

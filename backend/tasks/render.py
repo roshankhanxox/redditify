@@ -3,7 +3,7 @@ import os
 import shutil
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from celery import Celery
 
@@ -76,9 +76,9 @@ def generate_reel(self, job_id: str):
             db.commit()
 
     try:
+        from models import Job
         from services import assets, storage, title_card, tts, video, whisper_service
         from services.text import preprocess_text
-        from models import Job
         from sync_db import SyncSessionLocal
 
         with SyncSessionLocal() as db:
@@ -314,7 +314,7 @@ def generate_reel(self, job_id: str):
         # owns the clock; clients only ever receive the timestamp.
         expires_at = None
         if (cfg.get("retention") or "ephemeral") == "ephemeral":
-            expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.RETENTION_TTL_MINUTES)
+            expires_at = datetime.now(UTC) + timedelta(minutes=settings.RETENTION_TTL_MINUTES)
 
         set_status("DONE", result_url=result_key, duration_seconds=duration, result_expires_at=expires_at)
 
@@ -329,7 +329,7 @@ def generate_reel(self, job_id: str):
         transient = isinstance(exc, (ConnectionError, TimeoutError))
         set_status("FAILED", error_message=str(exc)[:2000])
         if transient and self.request.retries < (self.max_retries or 0):
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc) from exc
         _cleanup_scratch(job_id)
         raise
     finally:

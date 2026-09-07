@@ -12,7 +12,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -21,7 +21,9 @@ from models import Clip, ClipJob, User, UserBackground
 from ratelimit import rate_limit
 from security import get_current_user
 from services.quota import check_clip_quota, increment_clip_quota
-from services.storage import presign_get, resolve as storage_resolve, delete as storage_delete
+from services.storage import delete as storage_delete
+from services.storage import presign_get
+from services.storage import resolve as storage_resolve
 
 router = APIRouter(tags=["clip-jobs"])
 
@@ -151,8 +153,8 @@ async def create_clip_job(
     # Validate background ownership + readiness
     try:
         bg_id = uuid.UUID(body.background_id)
-    except ValueError:
-        raise HTTPException(422, detail="Invalid background_id")
+    except ValueError as exc:
+        raise HTTPException(422, detail="Invalid background_id") from exc
 
     bg = await db.get(UserBackground, bg_id)
     if bg is None or bg.user_id != user.id:
@@ -288,7 +290,7 @@ async def download_clip(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    job = await _get_job_checked(job_id, user, db)
+    await _get_job_checked(job_id, user, db)
     clip = await db.get(Clip, clip_id)
     if clip is None or clip.job_id != job_id:
         raise HTTPException(404, detail="Clip not found")

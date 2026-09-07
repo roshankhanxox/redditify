@@ -23,10 +23,9 @@ import tempfile
 
 import cv2
 import numpy as np
+import torch
 from scipy import signal
 from scipy.interpolate import interp1d
-
-import torch
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +53,8 @@ def _ensure_s3fd():
     logger.info("Downloading S3FD weights (~50 MB)…")
     try:
         import gdown
-    except ImportError:
-        raise RuntimeError("gdown not installed — run: pip install gdown")
+    except ImportError as exc:
+        raise RuntimeError("gdown not installed — run: pip install gdown") from exc
     gdown.download(id=_S3FD_GDRIVE_ID, output=_S3FD_WEIGHT, quiet=False)
     if not os.path.isfile(_S3FD_WEIGHT):
         raise RuntimeError("S3FD weight download failed")
@@ -148,8 +147,8 @@ def _track_faces(
 def _load_asd_model(dev: torch.device):
     if _VENDOR not in sys.path:
         sys.path.insert(0, _VENDOR)
-    from model.Model import ASD_Model  # type: ignore
     from loss import lossAV  # type: ignore
+    from model.Model import ASD_Model  # type: ignore
 
     model = ASD_Model().to(dev)
     loss_fn = lossAV().to(dev)
@@ -182,8 +181,8 @@ def _score_tracks(
     try:
         import python_speech_features  # type: ignore
         from scipy.io import wavfile
-    except ImportError:
-        raise RuntimeError("python_speech_features not installed — run: pip install python_speech_features")
+    except ImportError as exc:
+        raise RuntimeError("python_speech_features not installed — run: pip install python_speech_features") from exc
 
     # Resample audio to 16 kHz mono WAV
     wav16 = os.path.join(tmp_dir, "audio_16k.wav")
@@ -330,7 +329,7 @@ def _build_crop_map(
     k = max(3, smooth_window | 1)
     cx_s = signal.medfilt(np.array(raw_cx, dtype=float), kernel_size=k)
     cy_s = signal.medfilt(np.array(raw_cy, dtype=float), kernel_size=k)
-    return list(zip(cx_s.tolist(), cy_s.tolist()))
+    return list(zip(cx_s.tolist(), cy_s.tolist(), strict=False))
 
 
 # ── frame rendering ───────────────────────────────────────────────────────────

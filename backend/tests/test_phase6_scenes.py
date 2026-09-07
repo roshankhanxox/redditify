@@ -17,7 +17,6 @@ from services.graphics import render_gradient, render_starry
 from services.tts import apply_pitch, pitch_filter
 from services.video import get_duration, render_meme_video
 
-
 # ------------------------------------------------------------------ registry
 
 

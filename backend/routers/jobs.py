@@ -10,19 +10,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from db import get_db
 from models import Job, User, UserBackground
-from security import get_current_user
 from ratelimit import rate_limit
+from security import get_current_user
+from services.fonts import get_font_path
 from services.jobs import find_active_job
 from services.quota import check_quota, increment_quota
+from services.scenes import DEFAULT_SCENE_ID, get_scene
 from services.storage import presign_get, resolve
 from services.tts import (
-    VOICE_CATALOG,
     VALID_EXPRESSIVENESS,
     VALID_TTS_PROVIDERS,
     VALID_VOICE_PERSONALITIES,
+    VOICE_CATALOG,
 )
-from services.scenes import DEFAULT_SCENE_ID, get_scene
-from services.fonts import get_font_path
 from tasks.render import generate_reel
 
 router = APIRouter(tags=["jobs"])
@@ -287,8 +287,8 @@ async def create_job(
         # Ownership + readiness are validated here AND re-checked in the worker.
         try:
             bg_id = uuid.UUID(job_settings.get("background_id") or "")
-        except ValueError:
-            raise HTTPException(422, detail="Invalid background id")
+        except ValueError as exc:
+            raise HTTPException(422, detail="Invalid background id") from exc
         bg = await db.get(UserBackground, bg_id)
         if bg is None or bg.user_id != user.id:
             raise HTTPException(403, detail="Not your background")
@@ -431,8 +431,14 @@ def _generate_preview_sync(job: Job) -> str | None:
 
     from services.storage import (
         delete as storage_delete,
+    )
+    from services.storage import (
         download as storage_download,
+    )
+    from services.storage import (
         resolve,
+    )
+    from services.storage import (
         upload as storage_upload,
     )
     from services.video import render_preview
@@ -485,6 +491,7 @@ async def job_preview(
     key = preview_key_for(job)
     if settings.STORAGE_BACKEND == "s3":
         from fastapi.responses import RedirectResponse
+
         from services.storage import stat as storage_stat
 
         if storage_stat(key) is None:

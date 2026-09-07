@@ -4,7 +4,7 @@ import shutil
 import sys
 import tempfile
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
 
@@ -30,7 +30,7 @@ def reap_expired_reels():
     from services import storage
     from sync_db import SyncSessionLocal
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     reaped = 0
     with SyncSessionLocal() as db:
         rows = db.execute(
@@ -52,7 +52,7 @@ def reap_expired_reels():
         db.execute(
             update(Job)
             .where(Job.id.in_([row[0] for row in rows]))
-            .values(result_url=None, result_expired_at=datetime.now(timezone.utc))
+            .values(result_url=None, result_expired_at=datetime.now(UTC))
         )
         db.commit()
         reaped = len(rows)
@@ -69,7 +69,7 @@ def sweep_stale_uploads():
     from services import storage
     from sync_db import SyncSessionLocal
 
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=48)
+    cutoff = datetime.now(UTC) - timedelta(hours=48)
     cleaned = 0
     with SyncSessionLocal() as db:
         rows = db.scalars(

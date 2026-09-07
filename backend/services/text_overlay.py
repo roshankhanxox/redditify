@@ -81,7 +81,7 @@ def render_text_overlay(spec: dict, out_path: str | None = None) -> str:
     draw = ImageDraw.Draw(img)
 
     y = pad
-    for line, lw, lh in zip(lines, widths, line_heights):
+    for line, lw, lh in zip(lines, widths, line_heights, strict=False):
         x = pad
         if align == "right":
             x = w - pad - lw

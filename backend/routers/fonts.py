@@ -1,9 +1,8 @@
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 
-from config import settings
 from security import get_current_user
 from services import fonts as fonts_service
 from services.storage import is_s3
