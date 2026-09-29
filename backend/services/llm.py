@@ -51,6 +51,13 @@ class AnthropicProvider(LLMProvider):
 
 
 class OpenAIProvider(LLMProvider):
+    # gpt-5* / o-series reject max_tokens. Omit the cap entirely so reasoning
+    # models can use the model's full output budget (a low max_completion_tokens
+    # often gets spent on reasoning and leaves content empty). Groq still needs
+    # an explicit max_tokens.
+    _max_tokens_param: str | None = None
+    _max_tokens: int | None = None
+
     def __init__(self, base_url: str | None = None, api_key: str | None = None, model: str | None = None):
         from openai import OpenAI
         kwargs: dict = {"api_key": api_key or settings.OPENAI_API_KEY}
@@ -60,20 +67,25 @@ class OpenAIProvider(LLMProvider):
         self._model = model or settings.LLM_MODEL_OPENAI
 
     def complete(self, system: str, user: str) -> str:
-        resp = self._client.chat.completions.create(
-            model=self._model,
-            messages=[
+        create_kwargs: dict = {
+            "model": self._model,
+            "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user},
             ],
-            max_tokens=4096,
-        )
+        }
+        if self._max_tokens_param and self._max_tokens is not None:
+            create_kwargs[self._max_tokens_param] = self._max_tokens
+        resp = self._client.chat.completions.create(**create_kwargs)
         msg = resp.choices[0].message
         reasoning = getattr(msg, "reasoning", None)
         return _extract_content(msg.content or "", reasoning)
 
 
 class GroqProvider(OpenAIProvider):
+    _max_tokens_param = "max_tokens"
+    _max_tokens = 16384
+
     def __init__(self):
         super().__init__(
             base_url="https://api.groq.com/openai/v1",

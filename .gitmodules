@@ -1,0 +1,3 @@
+[submodule "backend/vendor/lrasd"]
+	path = backend/vendor/lrasd
+	url = https://github.com/roshankhanxox/LR-ASD.git

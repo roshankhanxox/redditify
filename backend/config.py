@@ -50,9 +50,14 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GROQ_API_KEY: str = ""
     LLM_MODEL_ANTHROPIC: str = "claude-sonnet-4-6"
-    LLM_MODEL_OPENAI: str = "gpt-4o"
+    LLM_MODEL_OPENAI: str = "gpt-5-mini"
     LLM_MODEL_GROQ: str = "openai/gpt-oss-20b"
     MAX_CLIPS_PER_JOB: int = 10
+
+    # Dev step cache — set DEV_STEP_CACHE=true to persist Whisper + LLM results
+    # across retries so you don't burn money re-running the same video.
+    DEV_STEP_CACHE: bool = False
+    DEV_STEP_CACHE_DIR: str = os.path.expanduser("~/.cache/reelbot-dev")
 
     class Config:
         env_file = os.path.join(os.path.dirname(__file__), ".env")

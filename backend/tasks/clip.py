@@ -9,6 +9,8 @@ Pipeline stages:
   DONE / FAILED
 """
 
+import hashlib
+import json
 import logging
 import os
 import shutil
@@ -20,6 +22,41 @@ from tasks.render import celery  # reuse the shared Celery instance
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Dev step cache — skip Whisper + LLM on retry when DEV_STEP_CACHE=true
+# ---------------------------------------------------------------------------
+
+def _cache_key(source_key: str, step: str, extra: str = "") -> str:
+    h = hashlib.sha256(f"{source_key}:{step}:{extra}".encode()).hexdigest()[:20]
+    return h
+
+
+def _cache_read(source_key: str, step: str, extra: str = ""):
+    from config import settings
+    if not settings.DEV_STEP_CACHE:
+        return None
+    path = os.path.join(settings.DEV_STEP_CACHE_DIR, f"{_cache_key(source_key, step, extra)}.json")
+    if os.path.exists(path):
+        with open(path) as f:
+            logger.info("DEV cache hit: %s (%s)", step, path)
+            return json.load(f)
+    return None
+
+
+def _cache_write(source_key: str, step: str, data, extra: str = ""):
+    from config import settings
+    if not settings.DEV_STEP_CACHE:
+        return
+    os.makedirs(settings.DEV_STEP_CACHE_DIR, exist_ok=True)
+    path = os.path.join(settings.DEV_STEP_CACHE_DIR, f"{_cache_key(source_key, step, extra)}.json")
+    with open(path, "w") as f:
+        json.dump(data, f)
+    logger.info("DEV cache write: %s (%s)", step, path)
+
+
+# ---------------------------------------------------------------------------
 
 
 def _set_status(job_id: str, status: str, **kwargs):
@@ -77,16 +114,33 @@ def analyse_and_clip(self, clip_job_id: str):
         ])
 
         # 3. Transcribe
-        _set_status(clip_job_id, "TRANSCRIBING")
-        words = whisper_service.transcribe(audio_path)
-        if not words:
-            raise RuntimeError("Whisper returned empty transcript — is there audio in the video?")
+        words = _cache_read(source_key, "transcript")
+        if words is None:
+            _set_status(clip_job_id, "TRANSCRIBING")
+            words = whisper_service.transcribe(audio_path)
+            if not words:
+                raise RuntimeError("Whisper returned empty transcript — is there audio in the video?")
+            _cache_write(source_key, "transcript", words)
+        else:
+            _set_status(clip_job_id, "TRANSCRIBING")
 
         # 4. LLM analysis
-        _set_status(clip_job_id, "ANALYSING")
-        clip_windows = analyse(words, video_duration, num_clips=num_clips)
-        if not clip_windows:
-            raise RuntimeError("LLM returned no valid clip windows")
+        _analysis_cache_extra = str(num_clips)
+        raw_windows = _cache_read(source_key, "analysis", _analysis_cache_extra)
+        if raw_windows is None:
+            _set_status(clip_job_id, "ANALYSING")
+            clip_windows = analyse(words, video_duration, num_clips=num_clips)
+            if not clip_windows:
+                raise RuntimeError("LLM returned no valid clip windows")
+            _cache_write(source_key, "analysis", _analysis_cache_extra, [
+                {"start": w.start, "end": w.end, "hook": w.hook, "reason": w.reason,
+                 "engagement_score": w.engagement_score, "clip_type": w.clip_type}
+                for w in clip_windows
+            ])
+        else:
+            _set_status(clip_job_id, "ANALYSING")
+            from services.clip_analyser import ClipWindow
+            clip_windows = [ClipWindow(**w) for w in raw_windows]
 
         logger.info("ClipJob %s: %d clip windows selected", clip_job_id, len(clip_windows))
 
