@@ -4,19 +4,54 @@ import { useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
-import {
-  Captions,
-  Mic,
-  Clapperboard,
-  Gamepad2,
-  Activity,
-  Gauge,
-  Play,
-} from "lucide-react";
+import { BrainCircuit, Scan, Mic, Captions, FlaskConical, Container } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
-const statuses = ["Queued", "Voice", "Transcribe", "Cover", "Composite", "Done"];
+const features = [
+  {
+    icon: BrainCircuit,
+    title: "LLM clip selection",
+    body: "Configurable provider — Anthropic, OpenAI, or Groq. The model reads the transcript and ranks clip windows by engagement score.",
+    tag: "anthropic · openai · groq",
+  },
+  {
+    icon: Scan,
+    title: "Smart crop",
+    body: "LR-ASD detects the active speaker face-by-face, per frame. The 9:16 crop window follows whoever is talking.",
+    tag: "lr-asd · s3fd · talknet",
+  },
+  {
+    icon: Mic,
+    title: "Local transcription",
+    body: "Whisper runs entirely offline. Word-level timestamps feed the caption pipeline — no cloud API, no cost per minute.",
+    tag: "openai-whisper · offline",
+  },
+  {
+    icon: Captions,
+    title: "Karaoke captions",
+    body: "Word-by-word highlight mode or standard chunk captions. Configurable font, color, position and outline — burned in via libass.",
+    tag: "ffmpeg · libass · ass",
+  },
+  {
+    icon: FlaskConical,
+    title: "Dev step cache",
+    body: (
+      <>
+        Set{" "}
+        <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">DEV_STEP_CACHE=true</code>{" "}
+        and Whisper + LLM results persist across retries. No re-billing the same video.
+      </>
+    ),
+    tag: "~/.cache/reelbot-dev",
+  },
+  {
+    icon: Container,
+    title: "Celery task queue",
+    body: "Clip jobs run on a dedicated worker. Failed jobs can be re-rendered from CLIPPING — skipping the LLM when clip rows already exist.",
+    tag: "celery · redis · postgres",
+  },
+];
 
 export function Bento() {
   const root = useRef<HTMLDivElement>(null);
@@ -24,178 +59,48 @@ export function Bento() {
   useGSAP(
     () => {
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-      gsap.utils.toArray<HTMLElement>("[data-bento-card]").forEach((el) => {
+      gsap.utils.toArray<HTMLElement>("[data-feat-card]").forEach((el) => {
         gsap.from(el, {
-          y: 32,
+          y: 24,
           opacity: 0,
-          duration: 0.8,
+          duration: 0.7,
           ease: "power3.out",
-          scrollTrigger: { trigger: el, start: "top 88%" },
+          scrollTrigger: { trigger: el, start: "top 90%" },
         });
-      });
-      gsap.utils.toArray<HTMLElement>("[data-scroll-img]").forEach((el) => {
-        gsap
-          .timeline({
-            scrollTrigger: { trigger: el, start: "top bottom", end: "bottom top", scrub: true },
-          })
-          .fromTo(
-            el,
-            { scale: 0.82, opacity: 0.35, filter: "brightness(0.6)" },
-            { scale: 1, opacity: 1, filter: "brightness(1)", ease: "none", duration: 0.5 },
-          )
-          .to(el, { scale: 1.06, opacity: 0.25, filter: "brightness(0.5)", ease: "none", duration: 0.5 });
       });
     },
     { scope: root },
   );
 
   return (
-    <div ref={root} id="features" className="scroll-mt-24 py-32 md:py-48">
+    <div ref={root} id="features" className="scroll-mt-20 py-24 md:py-36">
       <section className="mx-auto w-full max-w-6xl px-6">
-        <div className="mb-14 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-          <h2 className="font-heading max-w-xl text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-            Everything between paste and post.
-          </h2>
-          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground md:text-right">
-            Six systems run on every render — narration, captions, artwork, footage,
-            queueing and quotas — without a single manual edit.
-          </p>
-        </div>
+        <p className="font-mono text-[11px] font-medium tracking-[0.1em] text-muted-foreground uppercase mb-4">
+          What&apos;s inside
+        </p>
+        <h2 className="font-heading text-[clamp(1.9rem,3.5vw,2.8rem)] font-semibold tracking-tight leading-tight text-balance max-w-xl">
+          Built on real open-source tooling.<br />Runs on your hardware.
+        </h2>
 
-        <div className="grid grid-flow-dense grid-cols-1 gap-3 md:grid-cols-2 lg:auto-rows-[230px] lg:grid-cols-4">
-          <article
-            data-bento-card
-            className="group relative flex min-h-[320px] flex-col justify-end overflow-hidden rounded-2xl border border-white/8 bg-card p-6 md:min-h-0 lg:col-span-2 lg:row-span-2"
-          >
-            <div data-scroll-img className="absolute inset-0 will-change-transform">
-              <div className="h-full w-full bg-gradient-to-b from-zinc-800 via-zinc-950 to-black" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/30" />
-            </div>
-            <div className="relative z-10 transition-transform duration-700 ease-out group-hover:-translate-y-1">
-              <Captions className="mb-3 size-5 text-white/70" />
-              <h3 className="text-lg font-semibold tracking-tight">Word-synced captions</h3>
-              <p className="mt-1 max-w-sm text-sm leading-relaxed text-white/60">
-                Whisper aligns every word locally; libass burns shorts-style subtitles
-                straight into the pixels.
+        <div className="mt-12 grid grid-cols-1 gap-px sm:grid-cols-2 lg:grid-cols-3 border border-white/8 rounded-xl overflow-hidden">
+          {features.map((f) => (
+            <article
+              key={f.title}
+              data-feat-card
+              className="flex flex-col gap-4 bg-card p-6 hover:bg-card/80 transition-colors"
+            >
+              <div className="flex size-9 items-center justify-center rounded-lg border border-brand/20 bg-brand/10">
+                <f.icon className="size-4 text-brand" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-[15px] font-semibold tracking-tight mb-2">{f.title}</h3>
+                <p className="text-[13.5px] leading-relaxed text-muted-foreground">{f.body}</p>
+              </div>
+              <p className="font-mono text-[11px] tracking-wide text-muted-foreground/60 uppercase border border-white/8 rounded px-2 py-1 self-start">
+                {f.tag}
               </p>
-              <p className="mt-5 inline-block rounded-lg bg-black/60 px-3 py-2 text-xl leading-tight font-extrabold backdrop-blur [text-shadow:_0_2px_10px_rgb(0_0_0_/_60%)]">
-                then it <span className="text-brand">clicked</span>
-              </p>
-            </div>
-          </article>
-
-          <article
-            data-bento-card
-            className="group flex flex-col justify-between gap-6 overflow-hidden rounded-2xl border border-white/8 bg-card p-6 lg:col-span-2"
-          >
-            <div>
-              <Mic className="mb-3 size-5 text-muted-foreground" />
-              <h3 className="text-lg font-semibold tracking-tight">Narration on tap</h3>
-              <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                20+ voices across two engines, with playback speed from 0.8× to 1.5×.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-                Auto
-              </span>
-              <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-muted-foreground transition-colors group-hover:border-white/20">
-                ElevenLabs
-              </span>
-              <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-muted-foreground transition-colors group-hover:border-white/20">
-                Local TTS
-              </span>
-              <span className="ml-auto font-mono text-xs text-muted-foreground">speed 1.15×</span>
-            </div>
-          </article>
-
-          <article
-            data-bento-card
-            className="group flex flex-col justify-between gap-6 rounded-2xl border border-white/8 bg-card p-6"
-          >
-            <div>
-              <Clapperboard className="mb-3 size-5 text-muted-foreground" />
-              <h3 className="text-base font-semibold tracking-tight">Cover frames</h3>
-            </div>
-            <div className="flex gap-2">
-              <span className="h-12 flex-1 rounded-md border border-white/10 bg-neutral-900" />
-              <span className="h-12 flex-1 rounded-md border border-black/10 bg-neutral-200" />
-              <span className="h-12 flex-1 rounded-md border border-white/10 bg-gradient-to-b from-neutral-900 to-neutral-800" />
-            </div>
-            <p className="text-xs text-muted-foreground">dark · light · minimal</p>
-          </article>
-
-          <article
-            data-bento-card
-            className="group relative flex min-h-[240px] flex-col justify-end overflow-hidden rounded-2xl border border-white/8 bg-card p-6"
-          >
-            <div data-scroll-img className="absolute inset-0 will-change-transform">
-              <div className="h-full w-full bg-gradient-to-b from-stone-800 via-neutral-950 to-black" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
-            </div>
-            <Gamepad2 className="relative z-10 mb-auto size-5 text-white/80" />
-            <span className="absolute top-1/2 left-1/2 z-10 flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/40 backdrop-blur transition-transform duration-500 group-hover:scale-110">
-              <Play className="ml-0.5 size-4 fill-white text-white" />
-            </span>
-            <div className="relative z-10">
-              <h3 className="text-base font-semibold tracking-tight">Gameplay loops</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Auto-looped to voiceover length</p>
-            </div>
-          </article>
-
-          <article
-            data-bento-card
-            className="group flex flex-col justify-between gap-6 overflow-hidden rounded-2xl border border-white/8 bg-card p-6 lg:col-span-2"
-          >
-            <div>
-              <Activity className="mb-3 size-5 text-muted-foreground" />
-              <h3 className="text-lg font-semibold tracking-tight">Live job tracking</h3>
-              <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Every stage is visible in real time, with backoff polling until the file lands.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {statuses.map((s, i) => (
-                <span key={s} className="flex items-center gap-1.5">
-                  <span
-                    className={
-                      i === statuses.length - 1
-                        ? "rounded-full bg-brand/15 px-2.5 py-1 font-mono text-xs tracking-wider text-brand uppercase"
-                        : "rounded-full border border-white/10 px-2.5 py-1 font-mono text-xs tracking-wider text-muted-foreground uppercase"
-                    }
-                  >
-                    {s}
-                  </span>
-                  {i < statuses.length - 1 && (
-                    <span aria-hidden className="text-xs text-muted-foreground">→</span>
-                  )}
-                </span>
-              ))}
-            </div>
-          </article>
-
-          <article
-            data-bento-card
-            className="group flex flex-col justify-between gap-6 overflow-hidden rounded-2xl border border-white/8 bg-card p-6 lg:col-span-2"
-          >
-            <div>
-              <Gauge className="mb-3 size-5 text-muted-foreground" />
-              <h3 className="text-lg font-semibold tracking-tight">Quotas that scale</h3>
-              <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                Free accounts render on a fair-use meter; admins are uncapped.
-              </p>
-            </div>
-            <div className="flex items-end gap-8">
-              <p className="text-4xl font-medium tracking-tighter">
-                3<span className="mx-1.5 text-lg text-muted-foreground">/</span>
-                <span className="text-lg text-muted-foreground">day</span>
-              </p>
-              <p className="text-4xl font-medium tracking-tighter">
-                30<span className="mx-1.5 text-lg text-muted-foreground">/</span>
-                <span className="text-lg text-muted-foreground">month</span>
-              </p>
-            </div>
-          </article>
+            </article>
+          ))}
         </div>
       </section>
     </div>

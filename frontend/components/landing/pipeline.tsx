@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef } from "react";
-import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
@@ -10,53 +9,41 @@ gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const steps = [
   {
-    name: "Voiceover",
-    detail:
-      "Your text is narrated by ElevenLabs or a free local engine. Auto picks the best available voice and falls back silently.",
-    tech: "ElevenLabs · edge-tts",
+    name: "Download",
+    detail: "Source video pulled from object storage. MinIO in dev, any S3-compatible backend in prod.",
+    tech: "s3 · local adapter",
   },
   {
-    name: "Transcription",
-    detail:
-      "A local Whisper model time-aligns every spoken word for frame-accurate captions — no cloud calls.",
-    tech: "Whisper · offline",
+    name: "Transcribe",
+    detail: "Whisper extracts word-level timestamps locally. Results are cached on retry when DEV_STEP_CACHE is on.",
+    tech: "whisper · offline · cacheable",
   },
   {
-    name: "Title card",
-    detail:
-      "A cover frame is painted in dark, light or minimal style, complete with your subreddit label.",
-    tech: "Pillow",
+    name: "Analyse",
+    detail: "LLM reads the timestamped transcript and ranks clip windows by engagement. Also cached on retry.",
+    tech: "anthropic · openai · groq · cacheable",
   },
   {
-    name: "Gameplay loop",
-    detail:
-      "A vertical clip from your asset library is picked, trimmed and looped to the exact voiceover length.",
-    tech: "Asset pool",
+    name: "Smart crop",
+    detail: "Per-frame speaker detection via LR-ASD. The 9:16 crop window follows the highest-scoring face each frame.",
+    tech: "lr-asd · s3fd · pytorch",
   },
   {
-    name: "Composite and upload",
-    detail:
-      "FFmpeg merges audio, burned captions and footage into a 1080×1920 MP4, ready to download and post.",
-    tech: "FFmpeg · libass",
+    name: "Render & upload",
+    detail: "FFmpeg encodes the final 9:16 MP4 with captions burned in via libass, then uploads back to storage.",
+    tech: "ffmpeg · libass · s3",
   },
 ];
 
-function ScrubCopy() {
-  const text =
-    "Drop your text, pick a narrator, hit render. ReelBot writes the voiceover, times every caption, paints the cover, loops the gameplay and cuts the final file. You just download and post.";
-  return (
-    <p data-pipeline-copy className="mt-8 max-w-md text-lg leading-relaxed">
-      {text.split(" ").map((word, i) => (
-        <span key={i} data-word className="inline-block whitespace-pre">
-          {word}
-          {i < text.split(" ").length - 1 ? "\u00A0" : ""}
-        </span>
-      ))}
-    </p>
-  );
-}
+const clips = [
+  { hook: '"I quit my job on the spot"',           range: "0:14 – 1:42 · 88s", score: 94, caption: "karaoke" },
+  { hook: '"No one told me it would feel like this"', range: "2:05 – 3:11 · 66s", score: 87, caption: "karaoke" },
+  { hook: '"That\'s when everything clicked"',      range: "4:20 – 5:44 · 84s", score: 81, caption: "standard" },
+  { hook: '"She looked at me and just said…"',      range: "6:02 – 7:08 · 66s", score: 78, caption: "karaoke" },
+  { hook: '"I\'ve never been more terrified"',      range: "8:14 – 9:22 · 68s", score: 74, caption: "standard" },
+];
 
-export function Pipeline({ signedIn }: { signedIn: boolean }) {
+export function Pipeline({ signedIn: _signedIn }: { signedIn: boolean }) {
   const root = useRef<HTMLDivElement>(null);
 
   useGSAP(
@@ -72,53 +59,66 @@ export function Pipeline({ signedIn }: { signedIn: boolean }) {
           pinSpacing: false,
         });
       });
-      gsap.fromTo(
-        "[data-word]",
-        { opacity: 0.12 },
-        {
-          opacity: 1,
-          stagger: 0.05,
-          ease: "none",
-          scrollTrigger: {
-            trigger: "[data-pipeline-copy]",
-            start: "top 78%",
-            end: "bottom 45%",
-            scrub: true,
-          },
-        },
-      );
+      gsap.utils.toArray<HTMLElement>("[data-step]").forEach((el) => {
+        gsap.from(el, {
+          opacity: 0, x: -16, duration: 0.6, ease: "power3.out",
+          scrollTrigger: { trigger: el, start: "top 88%" },
+        });
+      });
     },
     { scope: root },
   );
 
   return (
-    <div ref={root} id="pipeline" className="scroll-mt-24 py-32 md:py-48">
+    <div ref={root} id="pipeline" className="scroll-mt-20 border-y border-white/8 bg-card/40 py-24 md:py-36">
       <section className="mx-auto grid w-full max-w-6xl gap-16 px-6 lg:grid-cols-2 lg:gap-24">
+        {/* left — sticky */}
         <div data-pipeline-left className="lg:self-start">
-          <h2 className="font-heading text-4xl font-semibold tracking-tight text-balance md:text-5xl">
-            From paste to post, hands-free.
+          <p className="font-mono text-[11px] font-medium tracking-[0.1em] text-muted-foreground uppercase mb-4">
+            How it runs
+          </p>
+          <h2 className="font-heading text-[clamp(1.9rem,3.2vw,2.6rem)] font-semibold tracking-tight leading-tight text-balance">
+            Five stages,<br />one background task.
           </h2>
-          <ScrubCopy />
-          <Link
-            href={signedIn ? "/dashboard" : "/sign-up"}
-            className="group mt-10 inline-flex items-center gap-2 text-sm font-medium"
-          >
-            Try it with your own story
-            <span className="transition-transform duration-300 group-hover:translate-x-1">→</span>
-          </Link>
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground max-w-sm">
+            Every clip job follows the same pipeline. Each stage is checkpointed — fail halfway and resume from where it broke, without re-running the expensive steps.
+          </p>
+
+          {/* job card mockup */}
+          <div className="mt-10 overflow-hidden rounded-xl border border-white/10 bg-card shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/8 bg-white/[0.025] px-4 py-3">
+              <span className="font-mono text-[12px] text-muted-foreground">clip_job / a3f9c12d</span>
+              <span className="rounded font-mono text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 px-2.5 py-1">
+                Done
+              </span>
+            </div>
+            <div className="divide-y divide-white/5 px-4 py-2">
+              {clips.map((c) => (
+                <div key={c.hook} className="flex items-center gap-3 py-2.5">
+                  <div className="h-14 w-8 shrink-0 rounded bg-muted/40 border border-white/8" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[12px] font-medium">{c.hook}</p>
+                    <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{c.range} · {c.caption}</p>
+                  </div>
+                  <span className="shrink-0 font-mono text-[12px] font-bold text-brand tabular-nums">{c.score}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
+        {/* right — steps */}
         <ol className="flex flex-col">
           {steps.map((step, i) => (
-            <li key={step.name} className="border-t border-white/8 py-10 first:border-t-0 lg:first:pt-0">
-              <p className="font-mono text-[13px] tabular-nums tracking-widest text-brand">0{i + 1}</p>
-              <h3 className="mt-3 font-heading text-xl font-semibold tracking-tight">{step.name}</h3>
-              <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-                {step.detail}
-              </p>
-              <p className="mt-3 font-mono text-xs tracking-wider text-muted-foreground/70 uppercase">
-                {step.tech}
-              </p>
+            <li
+              key={step.name}
+              data-step
+              className="border-t border-white/8 py-9 first:border-t-0 lg:first:pt-0"
+            >
+              <p className="font-mono text-[13px] font-bold tracking-wider text-brand tabular-nums">0{i + 1}</p>
+              <h3 className="font-heading mt-3 text-xl font-semibold tracking-tight">{step.name}</h3>
+              <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">{step.detail}</p>
+              <p className="mt-3 font-mono text-[11px] tracking-wider text-muted-foreground/60 uppercase">{step.tech}</p>
             </li>
           ))}
         </ol>

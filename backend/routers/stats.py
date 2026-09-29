@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
 from models import Job
 from security import get_current_user
-from services.quota import usage
 
 router = APIRouter(tags=["stats"])
 
@@ -22,12 +21,7 @@ async def my_stats(
         .where(Job.user_id == user.id, Job.status == "DONE")
     )
     total_reels, total_seconds = row.one()
-    quota = await usage(user.id)
-    unlimited = user.role == "admin"
     return {
         "total_reels": int(total_reels or 0),
         "total_seconds": round(float(total_seconds or 0.0), 1),
-        **quota,
-        "unlimited": unlimited,
-        "plan": getattr(user, "plan", "free") or "free",
     }

@@ -3,9 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { ArrowRight, Clapperboard, Film, Hourglass } from "lucide-react";
+import { ArrowRight, Clapperboard, Hourglass } from "lucide-react";
 import { api } from "@/lib/api";
 import type { JobList, StatsMe } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { ReelPlaceholder } from "@/components/reels/reel-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -15,7 +17,6 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
@@ -52,11 +53,7 @@ function greeting(): string {
 function Thumb({ job }: { job: JobList["items"][number] }) {
   const [failed, setFailed] = useState(false);
   if (!job.thumbnail_url || failed) {
-    return (
-      <div className="flex aspect-[9/16] items-center justify-center bg-muted">
-        <Film className="size-6 text-muted-foreground/50" />
-      </div>
-    );
+    return <ReelPlaceholder title={job.title || "Untitled reel"} />;
   }
   return (
     <img
@@ -70,12 +67,20 @@ function Thumb({ job }: { job: JobList["items"][number] }) {
 }
 
 function RecentReelCard({ job }: { job: JobList["items"][number] }) {
-  return (
-    <Link
-      href="/dashboard/reels"
-      className="group overflow-hidden rounded-lg border bg-card transition-colors hover:border-ring"
-    >
-      <Thumb job={job} />
+  const expired = job.status === "DONE" && !job.result_url;
+
+  const content = (
+    <>
+      <div className="relative">
+        <Thumb job={job} />
+        {expired && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[2px]">
+            <span className="rounded-full bg-background/80 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+              expired
+            </span>
+          </div>
+        )}
+      </div>
       <div className="flex flex-col gap-1.5 p-3">
         <p className="truncate text-sm font-medium">{job.title || "Untitled reel"}</p>
         <div className="flex items-center gap-2 text-[13px] tabular-nums text-muted-foreground">
@@ -86,6 +91,23 @@ function RecentReelCard({ job }: { job: JobList["items"][number] }) {
           <span className="ml-auto">{timeAgo(job.created_at)}</span>
         </div>
       </div>
+    </>
+  );
+
+  if (expired) {
+    return (
+      <div className="overflow-hidden rounded-lg border bg-card opacity-60">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href="/dashboard/reels"
+      className="group overflow-hidden rounded-lg border bg-card transition-colors hover:border-ring"
+    >
+      {content}
     </Link>
   );
 }
@@ -124,12 +146,6 @@ export default function HomePage() {
       latest?.items.some((j) => !["DONE", "FAILED"].includes(j.status)) ? 4000 : 30000,
   });
 
-  const quotaLeft = stats
-    ? stats.unlimited
-      ? null
-      : Math.max(0, stats.daily_limit - stats.daily_used)
-    : null;
-
   return (
     <div className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -150,9 +166,9 @@ export default function HomePage() {
       </header>
 
       {/* Stat strip */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4">
         {!stats ? (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: 2 }).map((_, i) => (
             <Card key={i}>
               <CardContent className="flex flex-col gap-3 p-5">
                 <Skeleton className="h-4 w-20" />
@@ -162,31 +178,6 @@ export default function HomePage() {
           ))
         ) : (
           <>
-            <StatCard
-              label="Videos left today"
-              value={quotaLeft === null ? "∞" : quotaLeft}
-              hint={
-                stats.unlimited
-                  ? "Unlimited plan"
-                  : `${stats.daily_used}/${stats.daily_limit} used today`
-              }
-            >
-              {!stats.unlimited && (
-                <Progress
-                  value={(stats.daily_used / Math.max(1, stats.daily_limit)) * 100}
-                  className="h-1.5"
-                />
-              )}
-            </StatCard>
-            <StatCard
-              label="This month"
-              value={stats.unlimited ? "∞" : stats.monthly_used}
-              hint={
-                stats.unlimited
-                  ? "No monthly cap"
-                  : `of ${stats.monthly_limit} on ${stats.plan}`
-              }
-            />
             <StatCard label="Total reels" value={stats.total_reels} />
             <StatCard
               label="Watch time created"

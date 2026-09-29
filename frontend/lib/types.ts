@@ -82,12 +82,6 @@ export interface Job {
 export interface StatsMe {
   total_reels: number;
   total_seconds: number;
-  daily_used: number;
-  daily_limit: number;
-  monthly_used: number;
-  monthly_limit: number;
-  unlimited: boolean;
-  plan: string;
 }
 
 export interface JobList {

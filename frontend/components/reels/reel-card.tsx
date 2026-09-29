@@ -115,51 +115,57 @@ function Media({ job }: { job: Job }) {
     );
   }
 
-  if (job.preview_url && !vidFailed) {
-    return (
-      <video
-        ref={videoRef}
-        src={
-          warmRetry
-            ? `/api/proxy/jobs/${job.id}/preview`
-            : (job.preview_url ?? undefined)
-        }
-        poster={job.thumbnail_url ?? undefined}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        onError={() => (warmRetry ? setVidFailed(true) : setWarmRetry(true))}
-        onMouseEnter={() => void videoRef.current?.play()}
-        onMouseLeave={() => {
-          const v = videoRef.current;
-          if (v) {
-            v.pause();
-            v.currentTime = 0;
-          }
-        }}
-        className="aspect-[9/16] w-full object-cover"
-      />
-    );
-  }
+  // Stack: thumbnail img always visible as base; video overlays on hover.
+  // This means the poster is never dependent on the video URL being alive —
+  // if the thumbnail presign expired we fall through to ReelPlaceholder, but
+  // the video can still be played via the warm-retry proxy URL.
+  const thumbSrc = job.thumbnail_url && !imgFailed ? job.thumbnail_url : null;
+  const videoSrc = job.preview_url && !vidFailed
+    ? (warmRetry ? `/api/proxy/jobs/${job.id}/preview` : job.preview_url)
+    : null;
 
-  if (job.thumbnail_url && !imgFailed) {
-    return (
-      <img
-        src={job.thumbnail_url}
-        alt=""
-        loading="lazy"
-        onError={() => setImgFailed(true)}
-        className="aspect-[9/16] w-full object-cover"
-      />
-    );
-  }
+  return (
+    <div
+      className="group/media relative aspect-[9/16] w-full overflow-hidden"
+      onMouseEnter={() => void videoRef.current?.play()}
+      onMouseLeave={() => {
+        const v = videoRef.current;
+        if (v) { v.pause(); v.currentTime = 0; }
+      }}
+    >
+      {/* Static thumbnail — always rendered as the base layer */}
+      {thumbSrc ? (
+        <img
+          src={thumbSrc}
+          alt=""
+          loading="lazy"
+          onError={() => setImgFailed(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0">
+          <ReelPlaceholder title={job.title} />
+        </div>
+      )}
 
-  // No thumbnail available — gradient placeholder with the reel title
-  return <ReelPlaceholder title={job.title} />;
+      {/* Video overlay — fades in on hover when a playable URL exists */}
+      {videoSrc && (
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          muted
+          loop
+          playsInline
+          preload="none"
+          onError={() => warmRetry ? setVidFailed(true) : setWarmRetry(true)}
+          className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-200 group-hover/media:opacity-100"
+        />
+      )}
+    </div>
+  );
 }
 
-function ReelPlaceholder({ title }: { title: string }) {
+export function ReelPlaceholder({ title }: { title: string }) {
   // Deterministic gradient hue from the title string so each reel gets its own colour
   const hue = title.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % 360;
   return (

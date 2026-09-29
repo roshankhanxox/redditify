@@ -32,15 +32,8 @@ async def check_quota(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """FastAPI dependency enforcing free-tier limits. Admins bypass entirely."""
-    if current_user.role == "admin":
-        return  # No limits
-    daily = await get_or_create_quota(db, current_user.id, today_period())
-    monthly = await get_or_create_quota(db, current_user.id, month_period())
-    if daily.count >= settings.FREE_DAILY_LIMIT:
-        raise HTTPException(429, detail=f"Daily limit reached ({settings.FREE_DAILY_LIMIT}/day on free plan)")
-    if monthly.count >= settings.FREE_MONTHLY_LIMIT:
-        raise HTTPException(429, detail=f"Monthly limit reached ({settings.FREE_MONTHLY_LIMIT}/month on free plan)")
+    """No-op: self-hosted instances have no per-user quota."""
+    pass
 
 
 async def increment_quota(user_id: uuid.UUID) -> None:
@@ -69,32 +62,19 @@ async def check_clip_quota(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Dependency enforcing free-tier clip-job limits + an in-flight concurrency
-    cap. Admins bypass counts but still respect a sane concurrency ceiling."""
+    """Enforces only the concurrency cap (prevents OOM on local machines).
+    Daily/monthly count limits are removed — self-hosted, user's own API key."""
     from models import ClipJob
 
     ACTIVE = ("QUEUED", "DOWNLOADING", "EXTRACTING_AUDIO", "TRANSCRIBING", "ANALYSING", "CLIPPING")
-    plan = getattr(current_user, "plan", "free") or "free"
-    premium = current_user.role == "admin" or plan == "premium"
-
     in_flight = await db.scalar(
         select(func.count())
         .select_from(ClipJob)
         .where(ClipJob.user_id == current_user.id, ClipJob.status.in_(ACTIVE))
     )
-    cap = settings.PREMIUM_CLIP_CONCURRENT if premium else settings.FREE_CLIP_CONCURRENT
+    cap = settings.PREMIUM_CLIP_CONCURRENT
     if (in_flight or 0) >= cap:
         raise HTTPException(429, detail=f"Too many clip jobs running at once (max {cap}). Wait for one to finish.")
-
-    if current_user.role == "admin":
-        return  # no count limits for admins
-
-    daily = await get_or_create_quota(db, current_user.id, clip_today_period())
-    monthly = await get_or_create_quota(db, current_user.id, clip_month_period())
-    if daily.count >= settings.FREE_CLIP_DAILY_LIMIT:
-        raise HTTPException(429, detail=f"Daily clip limit reached ({settings.FREE_CLIP_DAILY_LIMIT}/day on free plan)")
-    if monthly.count >= settings.FREE_CLIP_MONTHLY_LIMIT:
-        raise HTTPException(429, detail=f"Monthly clip limit reached ({settings.FREE_CLIP_MONTHLY_LIMIT}/month on free plan)")
 
 
 async def increment_clip_quota(user_id: uuid.UUID) -> None:

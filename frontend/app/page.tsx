@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
 import { SiteNav } from "@/components/landing/site-nav";
 import { Hero } from "@/components/landing/hero";
-import { VoiceMarquee } from "@/components/landing/marquee";
 import { Bento } from "@/components/landing/bento";
 import { Pipeline } from "@/components/landing/pipeline";
 import { Pricing } from "@/components/landing/pricing";
@@ -16,7 +15,6 @@ export default async function LandingPage() {
       <SiteNav signedIn={signedIn} />
       <main className="flex-1">
         <Hero signedIn={signedIn} />
-        <VoiceMarquee />
         <Bento />
         <Pipeline signedIn={signedIn} />
         <Pricing />

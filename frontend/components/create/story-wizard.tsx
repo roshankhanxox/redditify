@@ -167,13 +167,7 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
     return () => sub.unsubscribe();
   }, [watch]);
 
-  const { data: quota } = useSWR<{
-    daily_used: number;
-    daily_limit: number;
-    unlimited?: boolean;
-    plan?: string;
-  }>("/quota/me", fetcher, { refreshInterval: 30_000 });
-  const canRetain = quota?.plan === "premium" || quota?.unlimited;
+  const canRetain = true;
   const { data: assetData } = useSWR<AssetList>("/assets", fetcher);
 
   const values = watch();
@@ -501,9 +495,6 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
                         <Label htmlFor="ret-retain" className={`font-normal ${canRetain ? "" : "opacity-50"}`}>
                           Keep until I delete
                         </Label>
-                        {!canRetain && (
-                          <Badge variant="outline" className="text-xs uppercase tracking-wide">premium</Badge>
-                        )}
                       </div>
                     </RadioGroup>
                   </Row>
@@ -563,24 +554,6 @@ export function StoryWizard({ template = "story" }: { template?: "story" | "meme
           <RotateCcw />
           Reset all
         </Button>
-        {quota && (
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-sm font-medium">Quota</p>
-            <Progress
-              value={
-                quota.unlimited
-                  ? 0
-                  : (quota.daily_used / Math.max(1, quota.daily_limit)) * 100
-              }
-              className="mt-2 h-1.5"
-            />
-            <p className="mt-2 text-[13px] tabular-nums text-muted-foreground">
-              {quota.unlimited
-                ? "Unlimited renders"
-                : `${Math.max(0, quota.daily_limit - quota.daily_used)} videos left today`}
-            </p>
-          </div>
-        )}
       </aside>
     </div>
   );
@@ -1031,9 +1004,6 @@ function MemeLookStep({
             <Label htmlFor="meme-ret-retain" className={`font-normal ${canRetain ? "" : "opacity-50"}`}>
               Keep until I delete
             </Label>
-            {!canRetain && (
-              <Badge variant="outline" className="text-xs uppercase tracking-wide">premium</Badge>
-            )}
           </div>
         </RadioGroup>
       </Row>
